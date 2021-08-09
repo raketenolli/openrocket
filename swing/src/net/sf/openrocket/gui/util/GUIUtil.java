@@ -1,14 +1,6 @@
 package net.sf.openrocket.gui.util;
 
-import java.awt.Component;
-import java.awt.Container;
-import java.awt.Dimension;
-import java.awt.Font;
-import java.awt.Image;
-import java.awt.KeyboardFocusManager;
-import java.awt.Point;
-import java.awt.Toolkit;
-import java.awt.Window;
+import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ComponentAdapter;
@@ -284,6 +276,8 @@ public class GUIUtil {
 					}
 				}
 			}
+			// Set the select foreground for buttons to not be black on a blue background
+			UIManager.put("Button.selectForeground", Color.WHITE);
 		} catch (Exception e) {
 			log.warn("Error setting LAF: " + e);
 		}

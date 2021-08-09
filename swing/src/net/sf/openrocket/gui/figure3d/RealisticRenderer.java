@@ -14,6 +14,7 @@ import net.sf.openrocket.document.OpenRocketDocument;
 import net.sf.openrocket.gui.figure3d.geometry.Geometry;
 import net.sf.openrocket.gui.figure3d.geometry.Geometry.Surface;
 import net.sf.openrocket.motor.Motor;
+import net.sf.openrocket.rocketcomponent.InsideColorComponent;
 import net.sf.openrocket.rocketcomponent.RocketComponent;
 import net.sf.openrocket.util.Color;
 
@@ -90,26 +91,43 @@ public class RealisticRenderer extends RocketRenderer {
 	
 	@Override
 	public void renderComponent(final GL2 gl, Geometry geom, final float alpha) {
-	    Appearance app = getAppearance( geom.getComponent() );
-	    if (app.getPaint().getAlpha()<255){
-			// if transparent, draw inside the same as the outside so we dont get a cardboard interior on a clear payload bay
+		RocketComponent c = geom.getComponent();
+	    Appearance app = getAppearance(c);
+	    if (c instanceof InsideColorComponent) {
+			Appearance innerApp = getInsideAppearance(c);
+			if (((InsideColorComponent) c).getInsideColorComponentHandler().isInsideSameAsOutside()) innerApp = app;
+
+			render(gl, geom, Surface.INSIDE, innerApp, true, alpha);
+			if (((InsideColorComponent) c).getInsideColorComponentHandler().isEdgesSameAsInside())
+				render(gl, geom, Surface.EDGES, innerApp, false, alpha);
+			else
+				render(gl, geom, Surface.EDGES, app, false, alpha);
+		}
+	    else {
 			render(gl, geom, Surface.INSIDE, app, true, alpha);
-		}else{
-			render(gl, geom, Surface.INSIDE, DefaultAppearance.getDefaultAppearance(geom.getComponent()), true, 1.0f);
+			render(gl, geom, Surface.EDGES, app, false, alpha);
 		}
 		render(gl, geom, Surface.OUTSIDE, app, true, alpha);
-		render(gl, geom, Surface.EDGES, app, false, alpha);
+
 	}
 	
+	protected float[] convertColor(Appearance a, float alpha) {
+		float[] color = new float[4];
+		convertColor(a.getPaint(), color);
+		return color;
+	}
+
 	private void render(GL2 gl, Geometry g, Surface which, Appearance a, boolean decals, float alpha) {
 		final Decal t = a.getTexture();
 		final Texture tex = textures.getTexture(t);
 		
 		gl.glLightModeli(GL2.GL_LIGHT_MODEL_COLOR_CONTROL, GL2.GL_SEPARATE_SPECULAR_COLOR);
 		
+		float[] convertedColor = this.convertColor(a, alpha);
+		for (int i=0; i < convertedColor.length; i++) {
+			color[i] = convertedColor[i];
+		}
 		
-		convertColor(a.getPaint(), color);
-		color[3] = alpha;//re-set to "alpha" so that Unfinished renderer will show interior parts.
 		gl.glMaterialfv(GL.GL_FRONT, GLLightingFunc.GL_DIFFUSE, color, 0);
 		gl.glMaterialfv(GL.GL_FRONT, GLLightingFunc.GL_AMBIENT, color, 0);
 		
@@ -149,6 +167,7 @@ public class RealisticRenderer extends RocketRenderer {
 			
 			gl.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA);
 			gl.glEnable(GL.GL_BLEND);
+			gl.glEnable(GL2.GL_COLOR_MATERIAL);
 			gl.glDepthFunc(GL.GL_LEQUAL);
 			
 			gl.glMatrixMode(GLMatrixFunc.GL_MODELVIEW);
@@ -167,6 +186,7 @@ public class RealisticRenderer extends RocketRenderer {
 			gl.glPopMatrix();
 			gl.glMatrixMode(GLMatrixFunc.GL_MODELVIEW);
 			
+			gl.glDisable(GL2.GL_COLOR_MATERIAL);
 			tex.disable(gl);
 		}
 		
@@ -184,6 +204,19 @@ public class RealisticRenderer extends RocketRenderer {
 			ret = DefaultAppearance.getDefaultAppearance(c);
 		}
 		return ret;
+	}
+
+	protected Appearance getInsideAppearance(RocketComponent c) {
+		if (c instanceof InsideColorComponent) {
+			Appearance ret = ((InsideColorComponent)c).getInsideColorComponentHandler().getInsideAppearance();
+			if (ret == null) {
+				ret = DefaultAppearance.getDefaultAppearance(c);
+			}
+			return ret;
+		}
+		else {
+			return DefaultAppearance.getDefaultAppearance(c);
+		}
 	}
 	
 	private int toEdgeMode(Decal.EdgeMode m) {

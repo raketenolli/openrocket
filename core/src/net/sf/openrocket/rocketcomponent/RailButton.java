@@ -56,7 +56,7 @@ public class RailButton extends ExternalComponent implements AnglePositionable, 
 
 	private double radialDistance_m=0;
 	protected static final AngleMethod angleMethod = AngleMethod.RELATIVE;
-	private double angle_rad = 0;
+	private double angle_rad = Math.PI;
 	private int instanceCount = 1;
 	private double instanceSeparation = 0; // front-front along the positive rocket axis. i.e. [1,0,0];
 	
@@ -69,12 +69,16 @@ public class RailButton extends ExternalComponent implements AnglePositionable, 
 		this.setStandoff( 0.002);
 		this.setInstanceSeparation( this.outerDiameter_m * 6);
 		this.setMaterial(Databases.findMaterial(Material.Type.BULK, "Delrin"));
+		super.displayOrder_side = 14;		// Order for displaying the component in the 2D side view
+		super.displayOrder_back = 11;		// Order for displaying the component in the 2D back view
 	}
 	
 	public RailButton( final double od, final double ht ) {
 		this();
 		this.setOuterDiameter( od);
 		this.setTotalHeight( ht);
+		super.displayOrder_side = 14;		// Order for displaying the component in the 2D side view
+		super.displayOrder_back = 11;		// Order for displaying the component in the 2D back view
 	}
 	
 	public RailButton( final double od, final double id, final double ht, final double flangeThickness, final double _standoff ) {
@@ -86,6 +90,8 @@ public class RailButton extends ExternalComponent implements AnglePositionable, 
 		this.setStandoff( _standoff);
 		this.setInstanceSeparation( od*2);
 		this.setMaterial(Databases.findMaterial(Material.Type.BULK, "Delrin"));
+		super.displayOrder_side = 14;		// Order for displaying the component in the 2D side view
+		super.displayOrder_back = 11;		// Order for displaying the component in the 2D back view
 	}
 	
 	private static final RailButton make1010Button(){

@@ -25,6 +25,7 @@ import net.sf.openrocket.rocketvisitors.ListComponents;
 import net.sf.openrocket.rocketvisitors.ListMotorMounts;
 import net.sf.openrocket.startup.Application;
 import net.sf.openrocket.util.StateChangeListener;
+import net.sf.openrocket.gui.widgets.SelectColorButton;
 
 @SuppressWarnings("serial")
 public class FlightConfigurationPanel extends JPanel implements StateChangeListener {
@@ -43,11 +44,6 @@ public class FlightConfigurationPanel extends JPanel implements StateChangeListe
 	private final static int MOTOR_TAB_INDEX = 0;
 	private final static int RECOVERY_TAB_INDEX = 1;
 	private final static int SEPARATION_TAB_INDEX = 2;
-
-	@Override
-	public void stateChanged(EventObject e) {
-		updateButtonState();
-	}
 
 	public FlightConfigurationPanel(OpenRocketDocument doc) {
 		super(new MigLayout("fill","[grow][][][][][grow]"));
@@ -73,11 +69,16 @@ public class FlightConfigurationPanel extends JPanel implements StateChangeListe
 		separationConfigurationPanel = new SeparationConfigurationPanel(this, rocket);
 		tabs.add(trans.get("edtmotorconfdlg.lbl.Stagetab"), separationConfigurationPanel);
 
-		newConfButton = new JButton(trans.get("edtmotorconfdlg.but.Newconfiguration"));
+		newConfButton = new SelectColorButton(trans.get("edtmotorconfdlg.but.Newconfiguration"));
 		newConfButton.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
+				
 				addOrCopyConfiguration(false);
+				int lastRow = motorConfigurationPanel.table.getRowCount() - 1;
+				int lastCol = motorConfigurationPanel.table.getColumnCount() - 1;
+				motorConfigurationPanel.table.setRowSelectionInterval(lastRow, lastRow);
+				motorConfigurationPanel.table.setColumnSelectionInterval(lastCol, lastCol);
 				configurationChanged();
 			}
 			
@@ -85,7 +86,7 @@ public class FlightConfigurationPanel extends JPanel implements StateChangeListe
 		
 		this.add(newConfButton,"skip 1,gapright para");
 		
-		renameConfButton = new JButton(trans.get("edtmotorconfdlg.but.Renameconfiguration"));
+		renameConfButton = new SelectColorButton(trans.get("edtmotorconfdlg.but.Renameconfiguration"));
 		renameConfButton.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
@@ -95,7 +96,7 @@ public class FlightConfigurationPanel extends JPanel implements StateChangeListe
 		});
 		this.add(renameConfButton,"gapright para");
 		
-		removeConfButton = new JButton(trans.get("edtmotorconfdlg.but.Removeconfiguration"));
+		removeConfButton = new SelectColorButton(trans.get("edtmotorconfdlg.but.Removeconfiguration"));
 		removeConfButton.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
@@ -105,7 +106,7 @@ public class FlightConfigurationPanel extends JPanel implements StateChangeListe
 		});
 		this.add(removeConfButton,"gapright para");
 		
-		copyConfButton = new JButton(trans.get("edtmotorconfdlg.but.Copyconfiguration"));
+		copyConfButton = new SelectColorButton(trans.get("edtmotorconfdlg.but.Copyconfiguration"));
 		copyConfButton.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
@@ -146,7 +147,7 @@ public class FlightConfigurationPanel extends JPanel implements StateChangeListe
 			newConfig = new FlightConfiguration(rocket, null);
 			newId = newConfig.getId();
 		}
-
+		
 		// associate configuration with Id and select it
 		rocket.setFlightConfiguration(newId, newConfig);
 		rocket.setSelectedConfiguration(newId);
@@ -216,4 +217,11 @@ public class FlightConfigurationPanel extends JPanel implements StateChangeListe
 
 	}
 	
+	@Override
+	public void stateChanged(EventObject e) {
+		updateButtonState();
+		motorConfigurationPanel.synchronizeConfigurationSelection();
+		recoveryConfigurationPanel.synchronizeConfigurationSelection();
+		separationConfigurationPanel.synchronizeConfigurationSelection();
+	}
 }
