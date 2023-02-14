@@ -3,6 +3,9 @@ package net.sf.openrocket.gui.main;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 import javax.swing.JFileChooser;
 
@@ -31,9 +34,9 @@ public class SaveAsFileChooser extends JFileChooser {
 		this.document = document;
 		this.type = type;
 
-		this.setAcceptAllFileFilterUsed(true);
+		this.setAcceptAllFileFilterUsed(false);
 
-		File defaultFilename = document.getFile();
+		File defaultFilename = document.getFileNoExtension();
 		
 		switch( type ) {
 		default:
@@ -54,10 +57,10 @@ public class SaveAsFileChooser extends JFileChooser {
 			break;
 		}
 		
-		final RememberFilenamePropertyListener listner = new RememberFilenamePropertyListener();
-		this.addPropertyChangeListener(JFileChooser.FILE_FILTER_CHANGED_PROPERTY, listner);
-		this.addPropertyChangeListener(JFileChooser.SELECTED_FILE_CHANGED_PROPERTY, listner);
-		this.addPropertyChangeListener(JFileChooser.SELECTED_FILES_CHANGED_PROPERTY, listner);
+		final RememberFilenamePropertyListener listener = new RememberFilenamePropertyListener();
+		this.addPropertyChangeListener(JFileChooser.FILE_FILTER_CHANGED_PROPERTY, listener);
+		this.addPropertyChangeListener(JFileChooser.SELECTED_FILE_CHANGED_PROPERTY, listener);
+		this.addPropertyChangeListener(JFileChooser.SELECTED_FILES_CHANGED_PROPERTY, listener);
 		
 		this.setCurrentDirectory(((SwingPreferences) Application.getPreferences()).getDefaultDirectory());
 

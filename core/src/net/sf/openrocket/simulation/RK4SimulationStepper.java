@@ -58,9 +58,6 @@ public class RK4SimulationStepper extends AbstractSimulationStepper {
 	private static final double MAX_ROLL_RATE_CHANGE = 2 * Math.PI / 180;
 	private static final double MAX_PITCH_CHANGE = 4 * Math.PI / 180;
 	
-	private static final double MIN_TIME_STEP = 0.001;
-	
-	
 	private Random random;
 	
 	
@@ -341,7 +338,7 @@ public class RK4SimulationStepper extends AbstractSimulationStepper {
 		
 
 		// Linear forces in rocket coordinates
-		store.dragForce = store.forces.getCaxial() * dynP * refArea;
+		store.dragForce = store.forces.getCDaxial() * dynP * refArea;
 		double fN = store.forces.getCN() * dynP * refArea;
 		double fSide = store.forces.getCside() * dynP * refArea;
 		
@@ -582,7 +579,7 @@ public class RK4SimulationStepper extends AbstractSimulationStepper {
 			
 			if (store.flightConditions != null) {
 				double Re = (store.flightConditions.getVelocity() *
-						status.getConfiguration().getLength() /
+						status.getConfiguration().getLengthAerodynamic() /
 						store.flightConditions.getAtmosphericConditions().getKinematicViscosity());
 				data.setValue(FlightDataType.TYPE_REYNOLDS_NUMBER, Re);
 			}
@@ -646,7 +643,7 @@ public class RK4SimulationStepper extends AbstractSimulationStepper {
 		
 		if (store.forces != null) {
 			data.setValue(FlightDataType.TYPE_DRAG_COEFF, store.forces.getCD());
-			data.setValue(FlightDataType.TYPE_AXIAL_DRAG_COEFF, store.forces.getCaxial());
+			data.setValue(FlightDataType.TYPE_AXIAL_DRAG_COEFF, store.forces.getCDaxial());
 			data.setValue(FlightDataType.TYPE_FRICTION_DRAG_COEFF, store.forces.getFrictionCD());
 			data.setValue(FlightDataType.TYPE_PRESSURE_DRAG_COEFF, store.forces.getPressureCD());
 			data.setValue(FlightDataType.TYPE_BASE_DRAG_COEFF, store.forces.getBaseCD());

@@ -19,9 +19,10 @@ import net.sf.openrocket.document.OpenRocketDocument;
 import net.sf.openrocket.document.StorageOptions;
 import net.sf.openrocket.document.StorageOptions.FileType;
 import net.sf.openrocket.file.openrocket.OpenRocketSaver;
-import net.sf.openrocket.file.rocksim.export.RocksimSaver;
+import net.sf.openrocket.file.rocksim.export.RockSimSaver;
 import net.sf.openrocket.rocketcomponent.InsideColorComponent;
 import net.sf.openrocket.rocketcomponent.RocketComponent;
+import net.sf.openrocket.util.DecalNotFoundException;
 import net.sf.openrocket.util.MathUtil;
 
 public class GeneralRocketSaver {
@@ -52,7 +53,7 @@ public class GeneralRocketSaver {
 	 * @param document		the document to save.
 	 * @throws IOException	in case of an I/O error.
 	 */
-	public final void save(File dest, OpenRocketDocument document) throws IOException {
+	public final void save(File dest, OpenRocketDocument document) throws IOException, DecalNotFoundException {
 		save(dest, document, document.getDefaultStorageOptions());
 	}
 	
@@ -64,7 +65,7 @@ public class GeneralRocketSaver {
 	 * @param options		the storage options.
 	 * @throws IOException	in case of an I/O error.
 	 */
-	public final void save(File dest, OpenRocketDocument document, StorageOptions options) throws IOException {
+	public final void save(File dest, OpenRocketDocument document, StorageOptions options) throws IOException, DecalNotFoundException {
 		save(dest, document, options, null);
 	}
 	
@@ -76,7 +77,7 @@ public class GeneralRocketSaver {
 	 * @param progress      a SavingProgress object used to provide progress information
 	 * @throws IOException	in case of an I/O error.
 	 */
-	public final void save(File dest, OpenRocketDocument doc, SavingProgress progress) throws IOException {
+	public final void save(File dest, OpenRocketDocument doc, SavingProgress progress) throws IOException, DecalNotFoundException {
 		save(dest, doc, doc.getDefaultStorageOptions(), progress);
 	}
 	
@@ -89,7 +90,7 @@ public class GeneralRocketSaver {
 	 * @param progress      a SavingProgress object used to provide progress information
 	 * @throws IOException	in case of an I/O error.
 	 */
-	public final void save(File dest, OpenRocketDocument doc, StorageOptions opts, SavingProgress progress) throws IOException {
+	public final void save(File dest, OpenRocketDocument doc, StorageOptions opts, SavingProgress progress) throws IOException, DecalNotFoundException {
 		
 		// This method is the core operational method.  It saves the document into a new (hopefully unique)
 		// file, then if the save is successful, it will copy the file over the old one.
@@ -105,6 +106,9 @@ public class GeneralRocketSaver {
 		}
 		try {
 			save(dest.getName(), s, doc, opts);
+		} catch (DecalNotFoundException decex) {
+			temporaryNewFile.delete();
+			throw decex;
 		} finally {
 			s.close();
 		}
@@ -139,15 +143,15 @@ public class GeneralRocketSaver {
 	 */
 	public long estimateFileSize(OpenRocketDocument doc, StorageOptions options) {
 		if (options.getFileType() == StorageOptions.FileType.ROCKSIM) {
-			return new RocksimSaver().estimateFileSize(doc, options);
+			return new RockSimSaver().estimateFileSize(doc, options);
 		} else {
 			return new OpenRocketSaver().estimateFileSize(doc, options);
 		}
 	}
 	
-	private void save(String fileName, OutputStream output, OpenRocketDocument document, StorageOptions options) throws IOException {
+	private void save(String fileName, OutputStream output, OpenRocketDocument document, StorageOptions options) throws IOException, DecalNotFoundException {
 		
-		// For now, we don't save decal inforamtion in ROCKSIM files, so don't do anything
+		// For now, we don't save decal information in ROCKSIM files, so don't do anything
 		// which follows.
 		// TODO - add support for decals in ROCKSIM files?
 		if (options.getFileType() == FileType.ROCKSIM) {
@@ -181,8 +185,8 @@ public class GeneralRocketSaver {
 		saveAllPartsZipFile(output, document, options, usedDecals);
 	}
 	
-	public void saveAllPartsZipFile(OutputStream output, OpenRocketDocument document, StorageOptions options, Set<DecalImage> decals) throws IOException {
-		
+	public void saveAllPartsZipFile(OutputStream output, OpenRocketDocument document, StorageOptions options, Set<DecalImage> decals) throws IOException, DecalNotFoundException {
+
 		// Open a zip stream to write to.
 		ZipOutputStream zos = new ZipOutputStream(output);
 		zos.setLevel(9);
@@ -196,9 +200,12 @@ public class GeneralRocketSaver {
 			zos.closeEntry();
 			
 			// Now we write out all the decal images files.
-			
 			for (DecalImage image : decals) {
-				
+				if (image.isIgnored()) {
+					image.setIgnored(false);
+					continue;
+				}
+
 				String name = image.getName();
 				ZipEntry decal = new ZipEntry(name);
 				zos.putNextEntry(decal);
@@ -226,7 +233,7 @@ public class GeneralRocketSaver {
 			throws IOException {
 		
 		if (options.getFileType() == StorageOptions.FileType.ROCKSIM) {
-			new RocksimSaver().save(output, document, options);
+			new RockSimSaver().save(output, document, options);
 		} else {
 			new OpenRocketSaver().save(output, document, options);
 		}
@@ -234,9 +241,9 @@ public class GeneralRocketSaver {
 	
 	private static class ProgressOutputStream extends FilterOutputStream {
 		
-		private long estimatedSize;
+		private final long estimatedSize;
 		private long bytesWritten = 0;
-		private SavingProgress progressCallback;
+		private final SavingProgress progressCallback;
 		
 		ProgressOutputStream(OutputStream ostream, long estimatedSize, SavingProgress progressCallback) {
 			super(ostream);

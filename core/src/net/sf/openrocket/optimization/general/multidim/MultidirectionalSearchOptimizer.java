@@ -28,12 +28,12 @@ import net.sf.openrocket.util.Statistics;
 public class MultidirectionalSearchOptimizer implements FunctionOptimizer, Statistics {
 	private static final Logger log = LoggerFactory.getLogger(MultidirectionalSearchOptimizer.class);
 	
-	private List<Point> simplex = new ArrayList<Point>();
+	private final List<Point> simplex = new ArrayList<Point>();
 	
 	private ParallelFunctionCache functionExecutor;
 	
-	private boolean useExpansion = false;
-	private boolean useCoordinateSearch = false;
+	private final boolean useExpansion = false;
+	private final boolean useCoordinateSearch = false;
 	
 	private int stepCount = 0;
 	private int reflectionAcceptance = 0;
@@ -174,7 +174,7 @@ public class MultidirectionalSearchOptimizer implements FunctionOptimizer, Stati
 						
 						if (accept(coordinateSearch, currentValue)) {
 							
-							log.debug("Coordinate search successful, reseting simplex");
+							log.debug("Coordinate search successful, resetting simplex");
 							List<Point> toAbort = new LinkedList<Point>(simplex);
 							simplex.clear();
 							simplex.add(current);

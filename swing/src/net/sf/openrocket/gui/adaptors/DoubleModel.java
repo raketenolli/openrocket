@@ -207,6 +207,32 @@ public class DoubleModel implements StateChangeListener, ChangeSource, Invalidat
 			
 			quad2 = quad1 = quad0 = 0; // Not used
 		}
+
+		public ValueSliderModel(double min, DoubleModel max) {
+			this.islinear = true;
+			linearPosition = 1.0;
+
+			this.min = new DoubleModel(min);
+			this.mid = max; // Never use exponential scale
+			this.max = max;
+
+			max.addChangeListener(this);
+
+			quad2 = quad1 = quad0 = 0; // Not used
+		}
+
+		public ValueSliderModel(DoubleModel min, double max) {
+			this.islinear = true;
+			linearPosition = 1.0;
+
+			this.min = min;
+			this.mid = new DoubleModel(max); // Never use exponential scale
+			this.max = new DoubleModel(max);
+
+			min.addChangeListener(this);
+
+			quad2 = quad1 = quad0 = 0; // Not used
+		}
 		
 		
 		
@@ -295,7 +321,7 @@ public class DoubleModel implements StateChangeListener, ChangeSource, Invalidat
 				return MAX;
 			
 			double x;
-			if (value <= mid.getValue()) {
+			if ((value <= mid.getValue()) || (quad2 == 0)) {		// If quad 2 is 0, the midpoint is perfectly in center
 				// Use linear scale
 				//linear0 = min;
 				//linear1 = (mid-min)/pos;
@@ -417,8 +443,14 @@ public class DoubleModel implements StateChangeListener, ChangeSource, Invalidat
 				fireStateChanged();
 		}
 	}
-	
-	
+
+	public BoundedRangeModel getSliderModel() {
+		if (minValue == Double.NEGATIVE_INFINITY || maxValue == Double.POSITIVE_INFINITY) {
+			throw new IllegalArgumentException("Cannot create slider model for unbounded range");
+		}
+		return new ValueSliderModel(minValue, maxValue);
+	}
+
 	public BoundedRangeModel getSliderModel(DoubleModel min, DoubleModel max) {
 		return new ValueSliderModel(min, max);
 	}
@@ -426,9 +458,20 @@ public class DoubleModel implements StateChangeListener, ChangeSource, Invalidat
 	public BoundedRangeModel getSliderModel(double min, double max) {
 		return new ValueSliderModel(min, max);
 	}
+
+	public BoundedRangeModel getSliderModel(double min, DoubleModel max) {
+		return new ValueSliderModel(min, max);
+	}
+
+	public BoundedRangeModel getSliderModel(DoubleModel min, double max) {
+		return new ValueSliderModel(min, max);
+	}
 	
 	public BoundedRangeModel getSliderModel(double min, double mid, double max) {
-		return new ValueSliderModel(min, mid, max);
+		if (MathUtil.equals(mid, (max + min)/2.0))
+			return new ValueSliderModel(min, max);
+		else
+			return new ValueSliderModel(min, mid, max);
 	}
 	
 	public BoundedRangeModel getSliderModel(double min, double mid, DoubleModel max) {
@@ -563,7 +606,7 @@ public class DoubleModel implements StateChangeListener, ChangeSource, Invalidat
 	
 	private final ArrayList<EventListener> listeners = new ArrayList<EventListener>();
 	
-	private final UnitGroup units;
+	private UnitGroup units;
 	private Unit currentUnit;
 	
 	private final double minValue;
@@ -756,6 +799,12 @@ public class DoubleModel implements StateChangeListener, ChangeSource, Invalidat
 	 */
 	public void setValue(double v) {
 		checkState(true);
+
+		double clampedValue = MathUtil.clamp(v, minValue, maxValue);
+		if (clampedValue != v) {
+			log.debug("Clamped value " + v + " to " + clampedValue + " for " + this);
+			v = clampedValue;
+		}
 		
 		log.debug("Setting value " + v + " for " + this);
 		if (setMethod == null) {
@@ -852,6 +901,13 @@ public class DoubleModel implements StateChangeListener, ChangeSource, Invalidat
 			return;
 		log.debug("Setting unit for " + this + " to '" + u + "'");
 		currentUnit = u;
+		fireStateChanged();
+	}
+
+	public void setUnitGroup(UnitGroup unitGroup) {
+		this.units = unitGroup;
+		this.currentUnit = units.getDefaultUnit();
+		this.lastValue = this.currentUnit.toUnit(this.lastValue);
 		fireStateChanged();
 	}
 	

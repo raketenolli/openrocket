@@ -71,7 +71,7 @@ public class IntegrationTest {
 	private Action undoAction, redoAction;
 	
 	private AerodynamicCalculator aeroCalc = new BarrowmanCalculator();
-	private FlightConfiguration config;
+	private FlightConfigurationId fcid;
 	private FlightConditions conditions;
 	private String massComponentID = null;
 	
@@ -112,19 +112,17 @@ public class IntegrationTest {
 		
 		undoAction = UndoRedoAction.newUndoAction(document);
 		redoAction = UndoRedoAction.newRedoAction(document);
-        FlightConfigurationId fcid = document.getSimulation(0).getFlightConfigurationId();
-		config = document.getRocket().getFlightConfiguration(fcid);
+        fcid = document.getSimulation(0).getFlightConfigurationId();
+		FlightConfiguration config = document.getRocket().getFlightConfiguration(fcid);
 		conditions = new FlightConditions(config);
 		
 		// Test undo state
 		checkUndoState(null, null);
-		
-		InnerTube mmt = (InnerTube)config.getRocket().getChild(0).getChild(1).getChild(2);
 		 
 		// Compute cg+cp + altitude
 	    //   double cgx, double mass, double cpx, double cna)
 		checkCgCp(0.248, 0.0645, 0.320, 12.0);
-		checkAlt(48.2);
+		checkAlt(48.8);
 		
 		// Mass modification
 		document.addUndoPosition("Modify mass");
@@ -134,7 +132,7 @@ public class IntegrationTest {
 		
 		// Check cg+cp + altitude
 		checkCgCp(0.230, 0.0745, 0.320, 12.0);
-		checkAlt(37.2);
+		checkAlt(37.4);
 		
 		// Non-change
 		document.addUndoPosition("No change");
@@ -157,7 +155,7 @@ public class IntegrationTest {
 		
 		// Check cg+cp + altitude
 		checkCgCp(0.163, 0.0613, 0.275, 9.95);
-		checkAlt(45.0);
+		checkAlt(45.6);
 		
 		// Undo "Remove component" change
 		undoAction.actionPerformed(new ActionEvent(this, 0, "foo"));
@@ -166,7 +164,7 @@ public class IntegrationTest {
 		
 		// Check cg+cp + altitude
 		checkCgCp(0.230, 0.0745, 0.320, 12.0);
-		checkAlt(37.2);
+		checkAlt(37.4);
 		
 		// Undo "Name change" change
 		undoAction.actionPerformed(new ActionEvent(this, 0, "foo"));
@@ -183,7 +181,7 @@ public class IntegrationTest {
 		
 		// Check cg+cp + altitude
 		checkCgCp(0.248, 0.0645, 0.320, 12.0);
-		checkAlt(48.2);
+		checkAlt(48.87);
 		
 		// Redo "Modify mass" change
 		redoAction.actionPerformed(new ActionEvent(this, 0, "foo"));
@@ -192,7 +190,7 @@ public class IntegrationTest {
 		
 		// Check cg+cp + altitude
 		checkCgCp(0.230, 0.0745, 0.320, 12.0);
-		checkAlt(37.2);
+		checkAlt(37.4);
 		
 		// Mass modification
 		document.addUndoPosition("Modify mass2");
@@ -202,7 +200,7 @@ public class IntegrationTest {
 		
 		// Check cg+cp + altitude
 		checkCgCp(0.223, 0.0795, 0.320, 12.0);
-		checkAlt(32.7);
+		checkAlt(33);
 		
 		// Perform component movement
 		document.startUndo("Move component");
@@ -219,7 +217,7 @@ public class IntegrationTest {
 		
 		// Check cg+cp + altitude
 		checkCgCp(0.221, 0.0797, 0.320, 12.0);
-		checkAlt(32.7);
+		checkAlt(33);
 		
 		// Modify mass without setting undo description
 		massComponent().setComponentMass(0.020);
@@ -236,7 +234,7 @@ public class IntegrationTest {
 		
 		// Check cg+cp + altitude
 		checkCgCp(0.221, 0.0797, 0.320, 12.0);
-		checkAlt(32.7);
+		checkAlt(33);
 		
 		// Undo "Move component" change
 		undoAction.actionPerformed(new ActionEvent(this, 0, "foo"));
@@ -245,7 +243,7 @@ public class IntegrationTest {
 		
 		// Check cg+cp + altitude
 		checkCgCp(0.223, 0.0795, 0.320, 12.0);
-		checkAlt(32.7);
+		checkAlt(33);
 		
 		// Redo "Move component" change
 		redoAction.actionPerformed(new ActionEvent(this, 0, "foo"));
@@ -254,7 +252,7 @@ public class IntegrationTest {
 		
 		// Check cg+cp + altitude
 		checkCgCp(0.221, 0.0797, 0.320, 12.0);
-		checkAlt(32.7);
+		checkAlt(33);
 		
 	}
 	
@@ -330,6 +328,7 @@ public class IntegrationTest {
 	}
 	
 	private void checkCgCp(double cgx, double mass, double cpx, double cna) {
+		FlightConfiguration config = document.getRocket().getFlightConfiguration(fcid);
 		final RigidBody launchData = MassCalculator.calculateLaunch(config);
 		final Coordinate cg = launchData.getCenterOfMass();
 		assertEquals(cgx, cg.x, 0.001);

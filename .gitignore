@@ -49,9 +49,12 @@
 # User-specific stuff:
 .idea/workspace.xml
 .idea/tasks.xml
+.idea/shelf
 .idea/dictionaries
 .idea/vcs.xml
 .idea/jsLibraryMappings.xml
+.idea/codeStyles/
+.idea/runConfigurations.xml
 
 # Sensitive or high-churn files:
 .idea/dataSources.ids
@@ -93,3 +96,4 @@ openrocket.log
 *.snap
 prime/*
 swing/resources/datafiles/presets/system.ser
+swing/resources/datafiles/presets

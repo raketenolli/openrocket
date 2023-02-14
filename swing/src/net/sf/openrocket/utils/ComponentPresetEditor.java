@@ -325,7 +325,7 @@ public class ComponentPresetEditor extends JPanel implements PresetResultListene
 	private boolean openComponentFile() {
 		final JFileChooser chooser = new JFileChooser();
 		chooser.addChoosableFileFilter(FileHelper.OPEN_ROCKET_COMPONENT_FILTER);
-		chooser.addChoosableFileFilter(FileHelper.CSV_FILE_FILTER);
+		chooser.addChoosableFileFilter(FileHelper.CSV_FILTER);
 		chooser.setFileFilter(FileHelper.OPEN_ROCKET_COMPONENT_FILTER);
 		chooser.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES);
 		if (editContext.getLastDirectory() != null) {
@@ -363,7 +363,7 @@ public class ComponentPresetEditor extends JPanel implements PresetResultListene
 					file = file.getParentFile();
 				}
 				presets = new ArrayList<ComponentPreset>();
-				MaterialHolder materialHolder = RocksimComponentFileTranslator.loadAll(presets, file);
+				MaterialHolder materialHolder = RockSimComponentFileTranslator.loadAll(presets, file);
 				editContext.setMaterialsLoaded(materialHolder);
 			}
 			if (presets != null) {

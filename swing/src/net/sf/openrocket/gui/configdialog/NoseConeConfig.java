@@ -3,9 +3,12 @@ package net.sf.openrocket.gui.configdialog;
 
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.ItemEvent;
+import java.awt.event.ItemListener;
 
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
+import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JSlider;
@@ -15,7 +18,9 @@ import net.miginfocom.swing.MigLayout;
 import net.sf.openrocket.document.OpenRocketDocument;
 import net.sf.openrocket.gui.SpinnerEditor;
 import net.sf.openrocket.gui.adaptors.BooleanModel;
+import net.sf.openrocket.gui.adaptors.CustomFocusTraversalPolicy;
 import net.sf.openrocket.gui.adaptors.DoubleModel;
+import net.sf.openrocket.gui.adaptors.TransitionShapeModel;
 import net.sf.openrocket.gui.components.BasicSlider;
 import net.sf.openrocket.gui.components.DescriptionArea;
 import net.sf.openrocket.gui.components.UnitSelector;
@@ -23,6 +28,7 @@ import net.sf.openrocket.l10n.Translator;
 import net.sf.openrocket.material.Material;
 import net.sf.openrocket.rocketcomponent.NoseCone;
 import net.sf.openrocket.rocketcomponent.RocketComponent;
+import net.sf.openrocket.rocketcomponent.SymmetricComponent;
 import net.sf.openrocket.rocketcomponent.Transition;
 import net.sf.openrocket.startup.Application;
 import net.sf.openrocket.unit.UnitGroup;
@@ -36,13 +42,14 @@ public class NoseConeConfig extends RocketComponentConfig {
 	private JLabel shapeLabel;
 	private JSpinner shapeSpinner;
 	private JSlider shapeSlider;
+	private final JCheckBox checkAutoBaseRadius;
 	private static final Translator trans = Application.getTranslator();
 	
 	// Prepended to the description from NoseCone.DESCRIPTIONS
 	private static final String PREDESC = "<html>";
 	
-	public NoseConeConfig(OpenRocketDocument d, RocketComponent c) {
-		super(d, c);
+	public NoseConeConfig(OpenRocketDocument d, RocketComponent c, JDialog parent) {
+		super(d, c, parent);
 		
 		final JPanel panel = new JPanel(new MigLayout("", "[][65lp::][30lp::]"));
 		
@@ -50,22 +57,20 @@ public class NoseConeConfig extends RocketComponentConfig {
 		{//// Nose cone shape:
 			panel.add(new JLabel(trans.get("NoseConeCfg.lbl.Noseconeshape")));
 
-			Transition.Shape selected = ((NoseCone) component).getType();
-			Transition.Shape[] typeList = Transition.Shape.values();
-
-			final JComboBox<Transition.Shape> typeBox = new JComboBox<Transition.Shape>(typeList);
+			final JComboBox<Transition.Shape> typeBox = new JComboBox<>(new TransitionShapeModel(c));
 			typeBox.setEditable(false);
-			typeBox.setSelectedItem(selected);
 			typeBox.addActionListener(new ActionListener() {
 				@Override
 				public void actionPerformed(ActionEvent e) {
 					Transition.Shape s = (Transition.Shape) typeBox.getSelectedItem();
-					((NoseCone) component).setType(s);
-					description.setText(PREDESC + s.getNoseConeDescription());
+					if (s != null) {
+						description.setText(PREDESC + s.getNoseConeDescription());
+					}
 					updateEnabled();
 				}
 			});
-			panel.add(typeBox, "span, wrap rel");
+			panel.add(typeBox, "spanx 3, growx, wrap rel");
+			order.add(typeBox);
 
 			////  Shape parameter:
 			this.shapeLabel = new JLabel(trans.get("NoseConeCfg.lbl.Shapeparam"));
@@ -76,6 +81,7 @@ public class NoseConeConfig extends RocketComponentConfig {
 			this.shapeSpinner = new JSpinner(parameterModel.getSpinnerModel());
 			shapeSpinner.setEditor(new SpinnerEditor(shapeSpinner));
 			panel.add(shapeSpinner, "growx");
+			order.add(((SpinnerEditor) shapeSpinner.getEditor()).getTextField());
 
 			DoubleModel min = new DoubleModel(component, "ShapeParameterMin");
 			DoubleModel max = new DoubleModel(component, "ShapeParameterMax");
@@ -92,6 +98,7 @@ public class NoseConeConfig extends RocketComponentConfig {
 			JSpinner spin = new JSpinner(lengthModel.getSpinnerModel());
 			spin.setEditor(new SpinnerEditor(spin));
 			panel.add(spin, "growx");
+			order.add(((SpinnerEditor) spin.getEditor()).getTextField());
 
 			panel.add(new UnitSelector(lengthModel), "growx");
 			panel.add(new BasicSlider(lengthModel.getSliderModel(0, 0.1, 0.7)), "w 100lp, wrap");
@@ -101,18 +108,21 @@ public class NoseConeConfig extends RocketComponentConfig {
 
 			panel.add(new JLabel(trans.get("NoseConeCfg.lbl.Basediam")));
 
-			final DoubleModel aftRadiusModel = new DoubleModel(component, "AftRadius", 2.0, UnitGroup.UNITS_LENGTH, 0); // Diameter = 2*Radius
-			final JSpinner radiusSpinner = new JSpinner(aftRadiusModel.getSpinnerModel());
+			final DoubleModel baseRadius = new DoubleModel(component, "BaseRadius", 2.0, UnitGroup.UNITS_LENGTH, 0); // Diameter = 2*Radius
+			final JSpinner radiusSpinner = new JSpinner(baseRadius.getSpinnerModel());
 			radiusSpinner.setEditor(new SpinnerEditor(radiusSpinner));
 			panel.add(radiusSpinner, "growx");
+			order.add(((SpinnerEditor) radiusSpinner.getEditor()).getTextField());
 
-			panel.add(new UnitSelector(aftRadiusModel), "growx");
-			panel.add(new BasicSlider(aftRadiusModel.getSliderModel(0, 0.04, 0.2)), "w 100lp, wrap 0px");
+			panel.add(new UnitSelector(baseRadius), "growx");
+			panel.add(new BasicSlider(baseRadius.getSliderModel(0, 0.04, 0.2)), "w 100lp, wrap 0px");
 
-			JCheckBox check = new JCheckBox(aftRadiusModel.getAutomaticAction());
+			checkAutoBaseRadius = new JCheckBox(baseRadius.getAutomaticAction());
 			//// Automatic
-			check.setText(trans.get("NoseConeCfg.checkbox.Automatic"));
-			panel.add(check, "skip, span 2, wrap");
+			checkAutoBaseRadius.setText(trans.get("NoseConeCfg.checkbox.Automatic"));
+			panel.add(checkAutoBaseRadius, "skip, span 2, wrap");
+			order.add(checkAutoBaseRadius);
+			updateCheckboxAutoBaseRadius(((NoseCone) component).isFlipped());
 		}
 
 		{////  Wall thickness:
@@ -122,15 +132,34 @@ public class NoseConeConfig extends RocketComponentConfig {
 			final JSpinner thicknessSpinner = new JSpinner(thicknessModel.getSpinnerModel());
 			thicknessSpinner.setEditor(new SpinnerEditor(thicknessSpinner));
 			panel.add(thicknessSpinner, "growx");
+			order.add(((SpinnerEditor) thicknessSpinner.getEditor()).getTextField());
 
 			panel.add(new UnitSelector(thicknessModel), "growx");
-			panel.add(new BasicSlider(thicknessModel.getSliderModel(0, 0.01)), "w 100lp, wrap 0px");
+			panel.add(new BasicSlider(thicknessModel.getSliderModel(0,
+							new DoubleModel(component, "MaxRadius", UnitGroup.UNITS_LENGTH))),
+					"w 100lp, wrap 0px");
 
 
 			final JCheckBox filledCheckbox = new JCheckBox(new BooleanModel(component, "Filled"));
 			//// Filled
-			filledCheckbox .setText(trans.get("NoseConeCfg.checkbox.Filled"));
-			panel.add(filledCheckbox, "skip, span 2, wrap");
+			filledCheckbox.setText(trans.get("NoseConeCfg.checkbox.Filled"));
+			filledCheckbox.setToolTipText(trans.get("NoseConeCfg.checkbox.Filled.ttip"));
+			panel.add(filledCheckbox, "skip, span 2, wrap para");
+			order.add(filledCheckbox);
+		}
+
+		{//// Flip to tail cone:
+			final JCheckBox flipCheckbox = new JCheckBox(new BooleanModel(component, "Flipped"));
+			flipCheckbox.setText(trans.get("NoseConeCfg.checkbox.Flip"));
+			flipCheckbox.setToolTipText(trans.get("NoseConeCfg.checkbox.Flip.ttip"));
+			panel.add(flipCheckbox, "spanx, wrap");
+			order.add(flipCheckbox);
+			flipCheckbox.addItemListener(new ItemListener() {
+				@Override
+				public void itemStateChanged(ItemEvent e) {
+					updateCheckboxAutoBaseRadius(e.getStateChange() == ItemEvent.SELECTED);
+				}
+			});
 		}
 
 		panel.add(new JLabel(""), "growy");
@@ -145,8 +174,9 @@ public class NoseConeConfig extends RocketComponentConfig {
 		
 
 		//// Material
-		panel2.add(materialPanel( Material.Type.BULK), "span, wrap");
-		panel.add(panel2, "cell 4 0, gapleft paragraph, aligny 0%, spany");
+		MaterialPanel materialPanel = new MaterialPanel(component, document, Material.Type.BULK, order);
+		panel2.add(materialPanel, "span, wrap");
+		panel.add(panel2, "cell 4 0, gapleft 40lp, aligny 0%, spany");
 		
 
 		//// General and General properties
@@ -156,6 +186,13 @@ public class NoseConeConfig extends RocketComponentConfig {
 		tabbedPane.insertTab(trans.get("NoseConeCfg.tab.Shoulder"), null, shoulderTab(),
 				trans.get("NoseConeCfg.tab.ttip.Shoulder"), 1);
 		tabbedPane.setSelectedIndex(0);
+
+		// Apply the custom focus travel policy to this config dialog
+		//// Make sure the cancel & ok button is the last component
+		order.add(cancelButton);
+		order.add(okButton);
+		CustomFocusTraversalPolicy policy = new CustomFocusTraversalPolicy(order);
+		parent.setFocusTraversalPolicy(policy);
 	}
 	
 	
@@ -165,6 +202,34 @@ public class NoseConeConfig extends RocketComponentConfig {
 		shapeSpinner.setEnabled(e);
 		shapeSlider.setEnabled(e);
 	}
-	
 
+	/**
+	 * Sets the checkAutoAftRadius checkbox's enabled state and tooltip text, based on the state of its next component.
+	 * If there is no next symmetric component or if that component already has its auto checkbox checked, the
+	 * checkAutoAftRadius checkbox is disabled.
+	 *
+	 * @param isFlipped	whether the nose cone is flipped
+	 */
+	private void updateCheckboxAutoBaseRadius(boolean isFlipped) {
+		if (component == null || checkAutoBaseRadius == null) return;
+
+		// Disable check button if there is no component to get the diameter from
+		NoseCone noseCone = ((NoseCone) component);
+		SymmetricComponent referenceComp = isFlipped ? noseCone.getPreviousSymmetricComponent() : noseCone.getNextSymmetricComponent();
+		if (referenceComp == null) {
+			checkAutoBaseRadius.setEnabled(false);
+			((NoseCone) component).setBaseRadiusAutomatic(false);
+			checkAutoBaseRadius.setToolTipText(trans.get("NoseConeCfg.checkbox.ttip.Automatic_noReferenceComponent"));
+			return;
+		}
+		if ((!isFlipped&& !referenceComp.usesPreviousCompAutomatic()) ||
+				isFlipped && !referenceComp.usesNextCompAutomatic()) {
+			checkAutoBaseRadius.setEnabled(true);
+			checkAutoBaseRadius.setToolTipText(trans.get("NoseConeCfg.checkbox.ttip.Automatic"));
+		} else {
+			checkAutoBaseRadius.setEnabled(false);
+			((NoseCone) component).setBaseRadiusAutomatic(false);
+			checkAutoBaseRadius.setToolTipText(trans.get("NoseConeCfg.checkbox.ttip.Automatic_alreadyAuto"));
+		}
+	}
 }

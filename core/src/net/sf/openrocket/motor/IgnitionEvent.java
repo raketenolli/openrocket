@@ -4,6 +4,7 @@ import java.util.Locale;
 
 import net.sf.openrocket.l10n.Translator;
 import net.sf.openrocket.rocketcomponent.AxialStage;
+import net.sf.openrocket.rocketcomponent.FlightConfiguration;
 import net.sf.openrocket.rocketcomponent.RocketComponent;
 import net.sf.openrocket.simulation.FlightEvent;
 import net.sf.openrocket.startup.Application;
@@ -13,43 +14,43 @@ public enum IgnitionEvent {
 	//// Automatic (launch or ejection charge)
 	AUTOMATIC( "AUTOMATIC", "MotorMount.IgnitionEvent.AUTOMATIC"){
 		@Override
-		public boolean isActivationEvent(FlightEvent testEvent, RocketComponent targetComponent) {
-			AxialStage targetStage = (AxialStage)targetComponent.getStage();
+		public boolean isActivationEvent(FlightConfiguration config, FlightEvent testEvent, RocketComponent targetComponent) {
+			AxialStage targetStage = targetComponent.getStage();
 			
-	        if ( targetStage.isLaunchStage() ){
-	        	return LAUNCH.isActivationEvent(testEvent, targetComponent);
+	        if (targetStage.isLaunchStage(config)) {
+	        	return LAUNCH.isActivationEvent(config, testEvent, targetComponent);
 	        } else {
-				return EJECTION_CHARGE.isActivationEvent(testEvent, targetComponent);
+				return EJECTION_CHARGE.isActivationEvent(config, testEvent, targetComponent);
 			}
 		}
 	},
 	LAUNCH ( "LAUNCH", "MotorMount.IgnitionEvent.LAUNCH"){
 		@Override
-		public boolean isActivationEvent( FlightEvent fe, RocketComponent source){
+		public boolean isActivationEvent(FlightConfiguration config,  FlightEvent fe, RocketComponent source){
 			return (fe.getType() == FlightEvent.Type.LAUNCH);
 		}
 	},
 	EJECTION_CHARGE ("EJECTION_CHARGE", "MotorMount.IgnitionEvent.EJECTION_CHARGE"){
 		@Override
-		public boolean isActivationEvent( FlightEvent testEvent, RocketComponent targetComponent){
+		public boolean isActivationEvent(FlightConfiguration config,  FlightEvent testEvent, RocketComponent targetComponent){
 			if (testEvent.getType() != FlightEvent.Type.EJECTION_CHARGE){
 				return false;
 			}
 			    
-			AxialStage targetStage = (AxialStage)targetComponent.getStage();
-			AxialStage eventStage =  (AxialStage)testEvent.getSource().getStage();
+			AxialStage targetStage = targetComponent.getStage();
+			AxialStage eventStage = testEvent.getSource().getStage();
 			AxialStage eventParentStage = eventStage.getUpperStage();
 			return ( targetStage.equals(eventParentStage));
 		}
 	},
 	BURNOUT ("BURNOUT", "MotorMount.IgnitionEvent.BURNOUT"){
 		@Override
-		public boolean isActivationEvent( FlightEvent testEvent, RocketComponent targetComponent){
+		public boolean isActivationEvent(FlightConfiguration config,  FlightEvent testEvent, RocketComponent targetComponent){
 			if (testEvent.getType() != FlightEvent.Type.BURNOUT)
 				return false;
 			
-			AxialStage targetStage = (AxialStage)targetComponent.getStage();
-			AxialStage eventStage =  (AxialStage)testEvent.getSource().getStage();
+			AxialStage targetStage = targetComponent.getStage();
+			AxialStage eventStage = testEvent.getSource().getStage();
 			AxialStage eventParentStage = eventStage.getUpperStage();
 			return ( targetStage.equals(eventParentStage));
 		}
@@ -64,7 +65,7 @@ public enum IgnitionEvent {
 
 	//public static final IgnitionEvent[] events = {AUTOMATIC, LAUNCH, EJECTION_CHARGE, BURNOUT, NEVER};
 	
-	public boolean isActivationEvent( FlightEvent fe, RocketComponent source){
+	public boolean isActivationEvent(FlightConfiguration config,  FlightEvent fe, RocketComponent source){
 		// default behavior. Also for the NEVER case. 
 		return false;
 	}		

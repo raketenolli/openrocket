@@ -3,29 +3,37 @@ package net.sf.openrocket.gui.plot;
 import java.awt.Window;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.awt.event.InputEvent;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
+import java.io.File;
 import java.util.ArrayList;
 
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JDialog;
+import javax.swing.JFileChooser;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 
 import net.miginfocom.swing.MigLayout;
 import net.sf.openrocket.document.Simulation;
 import net.sf.openrocket.gui.components.StyledLabel;
+import net.sf.openrocket.gui.util.FileHelper;
 import net.sf.openrocket.gui.util.GUIUtil;
 import net.sf.openrocket.gui.util.Icons;
+import net.sf.openrocket.gui.util.SwingPreferences;
 import net.sf.openrocket.l10n.Translator;
 import net.sf.openrocket.startup.Application;
 import net.sf.openrocket.startup.Preferences;
 import net.sf.openrocket.gui.widgets.SelectColorButton;
 
 import org.jfree.chart.ChartPanel;
+import org.jfree.chart.ChartUtilities;
+import org.jfree.chart.JFreeChart;
 
 /**
  * Dialog that shows a plot of a simulation results based on user options.
@@ -50,7 +58,14 @@ public class SimulationPlotDialog extends JDialog {
 		this.add(panel);
 		
 		final ChartPanel chartPanel = new SimulationChart(myPlot.getJFreeChart());
+		final JFreeChart jChart = myPlot.getJFreeChart();
 		panel.add(chartPanel, "grow, wrap 20lp");
+
+		// Ensures normal aspect-ratio of chart elements when resizing the panel
+		chartPanel.setMinimumDrawWidth(0);
+		chartPanel.setMaximumDrawWidth(Integer.MAX_VALUE);
+		chartPanel.setMinimumDrawHeight(0);
+		chartPanel.setMaximumDrawHeight(Integer.MAX_VALUE);
 		
 		//// Description text
 		JLabel label = new StyledLabel(trans.get("PlotDialog.lbl.Chart"), -2);
@@ -68,6 +83,26 @@ public class SimulationPlotDialog extends JDialog {
 			}
 		});
 		panel.add(check, "split, left");
+
+		//// Add series selection box
+		ArrayList<String> stages = new ArrayList<String>();
+		stages.add("All");
+		stages.addAll(Util.generateSeriesLabels(simulation));
+
+		final JComboBox<String> stageSelection = new JComboBox<>(stages.toArray(new String[0]));
+		stageSelection.addItemListener(new ItemListener() {
+
+			@Override
+			public void itemStateChanged(ItemEvent e) {
+				int selectedStage = stageSelection.getSelectedIndex() - 1;
+				myPlot.setShowBranch(selectedStage);
+			}
+
+		});
+		if (stages.size() > 2) {
+			// Only show the combo box if there are at least 3 entries (ie, "All", "Main", and one other one)
+			panel.add(stageSelection, "gapleft rel");
+		}
 		
 		//// Zoom in button
 		JButton button = new SelectColorButton(Icons.ZOOM_IN);
@@ -108,29 +143,16 @@ public class SimulationPlotDialog extends JDialog {
 			}
 		});
 		panel.add(button, "gapleft rel");
-		
-		//// Add series selection box
-		ArrayList<String> stages = new ArrayList<String>();
-		stages.add("All");
-		stages.addAll(Util.generateSeriesLabels(simulation));
-		
-		final JComboBox stageSelection = new JComboBox(stages.toArray(new String[0]));
-		stageSelection.addItemListener(new ItemListener() {
-			
+
+		//// Print chart button
+		button = new SelectColorButton(trans.get("PlotDialog.btn.exportImage"));
+		button.addActionListener(new ActionListener() {
 			@Override
-			public void itemStateChanged(ItemEvent e) {
-				int selectedStage = stageSelection.getSelectedIndex() - 1;
-				myPlot.setShowBranch(selectedStage);
+			public void actionPerformed(ActionEvent e) {
+				doPngExport(chartPanel,jChart);
 			}
-			
 		});
-		if (stages.size() > 2) {
-			// Only show the combo box if there are at least 3 entries (ie, "All", "Main", and one other one
-			panel.add(stageSelection, "gapleft rel");
-		}
-		
-		//// Spacer for layout to push close button to the right.
-		panel.add(new JPanel(), "growx");
+		panel.add(button, "gapleft rel");
 		
 		//// Close button
 		button = new SelectColorButton(trans.get("dlg.but.close"));
@@ -140,17 +162,46 @@ public class SimulationPlotDialog extends JDialog {
 				SimulationPlotDialog.this.dispose();
 			}
 		});
-		panel.add(button, "right");
-		
+		panel.add(button, "gapbefore push, right");
 		this.setLocationByPlatform(true);
 		this.pack();
 		
 		GUIUtil.setDisposableDialogOptions(this, button);
 		GUIUtil.rememberWindowSize(this);
+		this.setLocationByPlatform(true);
+		GUIUtil.rememberWindowPosition(this);
 	}
-	
-	
-	
+
+	private boolean doPngExport(ChartPanel chartPanel, JFreeChart chart){
+		JFileChooser chooser = new JFileChooser();
+		chooser.setAcceptAllFileFilterUsed(false);
+		chooser.setFileFilter(FileHelper.PNG_FILTER);
+		chooser.setCurrentDirectory(((SwingPreferences) Application.getPreferences()).getDefaultDirectory());
+
+		//// Ensures No Problems When Choosing File
+		if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION)
+			return false;
+
+		File file = chooser.getSelectedFile();
+		if (file == null)
+			return false;
+
+		file = FileHelper.forceExtension(file, "png");
+		if (!FileHelper.confirmWrite(file, this)) {
+			return false;
+		}
+
+		//// Uses JFreeChart Built In PNG Export Method
+		try{
+			ChartUtilities.saveChartAsPNG(file, chart, chartPanel.getWidth(), chartPanel.getHeight());
+		} catch(Exception e){
+			return false;
+		}
+
+		return true;
+	}
+
+
 	/**
 	 * Static method that shows a plot with the specified parameters.
 	 * 

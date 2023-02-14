@@ -1,6 +1,7 @@
 package net.sf.openrocket.simulation;
 
 import net.sf.openrocket.models.atmosphere.AtmosphericConditions;
+import net.sf.openrocket.rocketcomponent.InstanceMap;
 import net.sf.openrocket.rocketcomponent.RecoveryDevice;
 import net.sf.openrocket.simulation.exception.SimulationException;
 import net.sf.openrocket.util.Coordinate;
@@ -8,7 +9,11 @@ import net.sf.openrocket.util.GeodeticComputationStrategy;
 import net.sf.openrocket.util.MathUtil;
 import net.sf.openrocket.util.WorldCoordinate;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class BasicLandingStepper extends AbstractSimulationStepper {
+	private static final Logger log = LoggerFactory.getLogger(BasicLandingStepper.class);
 	
 	private static final double RECOVERY_TIME_STEP = 0.5;
 	
@@ -31,15 +36,21 @@ public class BasicLandingStepper extends AbstractSimulationStepper {
 		
 		// Get total CD
 		double mach = airSpeed.length() / atmosphere.getMachSpeed();
+		
+		final InstanceMap imap = status.getConfiguration().getActiveInstances();
 		for (RecoveryDevice c : status.getDeployedRecoveryDevices()) {
-			totalCD += c.getCD(mach) * c.getArea() / refArea;
+			totalCD += imap.count(c) * c.getCD(mach) * c.getArea() / refArea;
 		}
 		
 		// Compute drag force
 		double dynP = (0.5 * atmosphere.getDensity() * airSpeed.length2());
 		double dragForce = totalCD * dynP * refArea;
-		double mass = calculateStructureMass(status).getMass();
+
+		// Calculate mass data
+		double rocketMass = calculateStructureMass(status).getMass();
+		double motorMass = calculateMotorMass(status).getMass();
 		
+		double mass = rocketMass + motorMass;
 
 		// Compute drag acceleration
 		Coordinate linearAcceleration;
@@ -61,21 +72,52 @@ public class BasicLandingStepper extends AbstractSimulationStepper {
 		
 
 
-		// Select time step
-		double timeStep = MathUtil.min(0.5 / linearAcceleration.length(), RECOVERY_TIME_STEP);
+		// Select tentative time step
+		double timeStep = RECOVERY_TIME_STEP;
+
+		// adjust based on change in acceleration (ie jerk)
+		final double jerk = Math.abs(linearAcceleration.sub(status.getRocketAcceleration()).multiply(1.0/status.getPreviousTimeStep()).length());
+		if (jerk > MathUtil.EPSILON) {
+			timeStep = Math.min(timeStep, 1.0/jerk);
+		}
+		// but don't let it get *too* small
+		timeStep = Math.max(timeStep, MIN_TIME_STEP);
+		log.trace("timeStep is " + timeStep);
 		
 		// Perform Euler integration
-		status.setRocketPosition(status.getRocketPosition().add(status.getRocketVelocity().multiply(timeStep)).
-				add(linearAcceleration.multiply(MathUtil.pow2(timeStep) / 2)));
-		status.setRocketVelocity(status.getRocketVelocity().add(linearAcceleration.multiply(timeStep)));
+		Coordinate newPosition = status.getRocketPosition().add(status.getRocketVelocity().multiply(timeStep)).
+			add(linearAcceleration.multiply(MathUtil.pow2(timeStep) / 2));
+
+		// If I've hit the ground, recalculate time step and position
+		if (newPosition.z < 0) {
+
+			final double a = linearAcceleration.z;
+			final double v = status.getRocketVelocity().z;
+			final double z0 = status.getRocketPosition().z;
+
+			// The new timestep is the solution of
+			// 1/2 at^2 + vt + z0 = 0
+			timeStep = (-v - Math.sqrt(v*v - 2*a*z0))/a;
+			log.trace("ground hit changes timeStep to " + timeStep);
+			
+			newPosition = status.getRocketPosition().add(status.getRocketVelocity().multiply(timeStep)).
+				add(linearAcceleration.multiply(MathUtil.pow2(timeStep) / 2));
+
+			// avoid rounding error in new altitude
+			newPosition = newPosition.setZ(0);
+		}
+
 		status.setSimulationTime(status.getSimulationTime() + timeStep);
-		
+		status.setPreviousTimeStep(timeStep);
+
+		status.setRocketPosition(newPosition);
+		status.setRocketVelocity(status.getRocketVelocity().add(linearAcceleration.multiply(timeStep)));
+		status.setRocketAcceleration(linearAcceleration);
 
 		// Update the world coordinate
 		WorldCoordinate w = status.getSimulationConditions().getLaunchSite();
 		w = status.getSimulationConditions().getGeodeticComputation().addCoordinate(w, status.getRocketPosition());
 		status.setRocketWorldPosition(w);
-		
 
 		// Store data
 		FlightDataBranch data = status.getFlightData();
@@ -86,6 +128,8 @@ public class BasicLandingStepper extends AbstractSimulationStepper {
 		data.setValue(FlightDataType.TYPE_ALTITUDE, status.getRocketPosition().z);
 		data.setValue(FlightDataType.TYPE_POSITION_X, status.getRocketPosition().x);
 		data.setValue(FlightDataType.TYPE_POSITION_Y, status.getRocketPosition().y);
+
+		airSpeed = status.getRocketVelocity().add(windSpeed);
 		if (extra) {
 			data.setValue(FlightDataType.TYPE_POSITION_XY,
 					MathUtil.hypot(status.getRocketPosition().x, status.getRocketPosition().y));
@@ -100,7 +144,7 @@ public class BasicLandingStepper extends AbstractSimulationStepper {
 			data.setValue(FlightDataType.TYPE_ACCELERATION_TOTAL, linearAcceleration.length());
 			
 			double Re = airSpeed.length() *
-					status.getConfiguration().getLength() /
+					status.getConfiguration().getLengthAerodynamic() /
 					atmosphere.getKinematicViscosity();
 			data.setValue(FlightDataType.TYPE_REYNOLDS_NUMBER, Re);
 		}
@@ -122,7 +166,7 @@ public class BasicLandingStepper extends AbstractSimulationStepper {
 		data.setValue(FlightDataType.TYPE_MACH_NUMBER, mach);
 		
 		data.setValue(FlightDataType.TYPE_MASS, mass);
-		data.setValue(FlightDataType.TYPE_MOTOR_MASS, 0.0); // Is this a reasonable assumption? Probably.
+		data.setValue(FlightDataType.TYPE_MOTOR_MASS, motorMass);
 		
 		data.setValue(FlightDataType.TYPE_THRUST_FORCE, 0);
 		data.setValue(FlightDataType.TYPE_DRAG_FORCE, dragForce);
@@ -135,6 +179,7 @@ public class BasicLandingStepper extends AbstractSimulationStepper {
 		data.setValue(FlightDataType.TYPE_TIME_STEP, timeStep);
 		data.setValue(FlightDataType.TYPE_COMPUTATION_TIME,
 				(System.nanoTime() - status.getSimulationStartWallTime()) / 1000000000.0);
+		log.trace("time " + data.getLast(FlightDataType.TYPE_TIME) + ", altitude " + data.getLast(FlightDataType.TYPE_ALTITUDE) + ", velocity " + data.getLast(FlightDataType.TYPE_VELOCITY_Z));
 	}
 	
 }

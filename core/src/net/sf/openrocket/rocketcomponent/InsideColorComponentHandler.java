@@ -14,8 +14,8 @@ import java.util.EventObject;
 public class InsideColorComponentHandler {
     private final RocketComponent component;
     private Appearance insideAppearance = null;
-    private boolean insideSameAsOutside = true;
-    private boolean edgesSameAsInside = true;
+    private boolean separateInsideOutside = false;  // Flag for separate inside and outside appearance
+    private boolean edgesSameAsInside = false;      // Flag for setting the edge appearance to the inside (true) or outside (false) appearance
 
     public InsideColorComponentHandler(RocketComponent component) {
         this.component = component;
@@ -38,6 +38,12 @@ public class InsideColorComponentHandler {
      * @param appearance the inner appearance to be set
      */
     public void setInsideAppearance(Appearance appearance) {
+        for (RocketComponent listener : component.configListeners) {
+            if (listener instanceof InsideColorComponent) {
+                ((InsideColorComponent) listener).getInsideColorComponentHandler().setInsideAppearance(appearance);
+            }
+        }
+
         this.insideAppearance = appearance;
         if (this.insideAppearance != null) {
             Decal d = this.insideAppearance.getTexture();
@@ -72,26 +78,43 @@ public class InsideColorComponentHandler {
      * @param newState new edgesUseInsideAppearance value
      */
     public void setEdgesSameAsInside(boolean newState) {
+        for (RocketComponent listener : component.configListeners) {
+            if (listener instanceof InsideColorComponent) {
+                ((InsideColorComponent) listener).getInsideColorComponentHandler().setEdgesSameAsInside(newState);
+            }
+        }
+
         this.edgesSameAsInside = newState;
     }
 
     /**
-     * Checks whether the component should use the same appearance for the inside as the outside (return true) or as the
-     * outside (return false)
+     * Checks whether the component should use a separate appearance for the inside and outside.
      *
-     * @return  true if edges should use the same appearance as the inside,
-     *          false if edges should use the same appearance as the outside
+     * @return  true if a separate inside and outside appearance should be used,
+     *          false if the inside should have the outside appearance
      */
-    public boolean isInsideSameAsOutside() {
-        return this.insideSameAsOutside;
+    public boolean isSeparateInsideOutside() {
+        return this.separateInsideOutside;
     }
 
     /**
-     * Sets the new state for insideSameAsOutside to newState
+     * Sets the new state for separateInsideOutside to newState
      *
-     * @param newState new edgesUseInsideAppearance value
+     * @param newState new separateInsideOutside value
      */
-    public void setInsideSameAsOutside(boolean newState) {
-        this.insideSameAsOutside = newState;
+    public void setSeparateInsideOutside(boolean newState) {
+        for (RocketComponent listener : component.configListeners) {
+            if (listener instanceof InsideColorComponent) {
+                ((InsideColorComponent) listener).getInsideColorComponentHandler().setSeparateInsideOutside(newState);
+            }
+        }
+
+        this.separateInsideOutside = newState;
+    }
+
+    public void copyFrom(InsideColorComponentHandler src) {
+        this.insideAppearance = src.insideAppearance;
+        this.separateInsideOutside = src.separateInsideOutside;
+        this.edgesSameAsInside = src.edgesSameAsInside;
     }
 }

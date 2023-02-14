@@ -24,8 +24,10 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
 import net.miginfocom.swing.MigLayout;
+import net.sf.openrocket.communication.ReleaseInfo;
 import net.sf.openrocket.communication.UpdateInfo;
 import net.sf.openrocket.communication.UpdateInfoRetriever;
+import net.sf.openrocket.communication.UpdateInfoRetriever.ReleaseStatus;
 import net.sf.openrocket.gui.components.DescriptionArea;
 import net.sf.openrocket.gui.components.StyledLabel;
 import net.sf.openrocket.gui.components.StyledLabel.Style;
@@ -84,14 +86,7 @@ public class GeneralPreferencesPanel extends PreferencesPanel {
 		//// User-defined thrust curves:
 		this.add(new JLabel(trans.get("pref.dlg.lbl.User-definedthrust")), "spanx, wrap");
 		final JTextField field = new JTextField();
-		List<File> files = preferences.getUserThrustCurveFiles();
-		String str = "";
-		for (File file : files) {
-			if (str.length() > 0) {
-				str += ";";
-			}
-			str += file.getAbsolutePath();
-		}
+		String str = preferences.getUserThrustCurveFilesAsString();
 		field.setText(str);
 		field.getDocument().addDocumentListener(new DocumentListener() {
 			@Override
@@ -210,6 +205,18 @@ public class GeneralPreferencesPanel extends PreferencesPanel {
 			}
 		});
 		this.add(button, "right, wrap");
+
+		//// Check for beta releases
+		final JCheckBox betaUpdateBox = new JCheckBox(trans.get("pref.dlg.checkbox.CheckBetaupdates"));
+		betaUpdateBox.setToolTipText(trans.get("pref.dlg.checkbox.CheckBetaupdates.ttip"));
+		betaUpdateBox.setSelected(preferences.getCheckBetaUpdates());
+		betaUpdateBox.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				preferences.setCheckBetaUpdates(betaUpdateBox.isSelected());
+			}
+		});
+		this.add(betaUpdateBox, "gapleft para, wrap");
 		
 		//// Open most recent file on startup
 		final JCheckBox openRecentOnStartupBox = new JCheckBox(trans.get("pref.dlg.but.openlast"));
@@ -232,14 +239,28 @@ public class GeneralPreferencesPanel extends PreferencesPanel {
 			}
 		});
 		this.add(rocksimWarningDialogBox,"spanx, wrap");
-		
+
+		//// Clear cached preferences
+		final JButton clearCachedPreferences = new SelectColorButton(trans.get("pref.dlg.but.clearCachedPreferences"));
+		clearCachedPreferences.setToolTipText(trans.get("pref.dlg.but.clearCachedPreferences.ttip"));
+		clearCachedPreferences.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				int resultYesNo = JOptionPane.showConfirmDialog(parent, trans.get("pref.dlg.clearCachedPreferences.message"),
+						trans.get("pref.dlg.clearCachedPreferences.title"), JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+				if (resultYesNo == JOptionPane.YES_OPTION) {
+					preferences.clearPreferences();
+				}
+			}
+		});
+		this.add(clearCachedPreferences, "spanx, pushy, bottom, wrap");
 
 	}
 
 
 	private void checkForUpdates() {
 		final UpdateInfoRetriever retriever = new UpdateInfoRetriever();
-		retriever.start();
+		retriever.startFetchUpdateInfo();
 		
 		
 		// Progress dialog
@@ -290,30 +311,54 @@ public class GeneralPreferencesPanel extends PreferencesPanel {
 		
 		// Check result
 		UpdateInfo info = retriever.getUpdateInfo();
+
+		// Something went wrong
 		if (info == null) {
 			JOptionPane.showMessageDialog(this,
 					//// An error occurred while communicating with the server.
-					trans.get("pref.dlg.lbl.msg1"),
+					trans.get("update.dlg.error"),
 					//// Unable to retrieve update information
-					trans.get("pref.dlg.lbl.msg2"), JOptionPane.WARNING_MESSAGE, null);
-		} else if (info.getLatestVersion() == null ||
-				info.getLatestVersion().equals("") ||
-				BuildProperties.getVersion().equalsIgnoreCase(info.getLatestVersion())) {
-			JOptionPane.showMessageDialog(this,
-					//// You are running the latest version of OpenRocket.
-					trans.get("pref.dlg.lbl.msg3"),
-					//// No updates available
-					trans.get("pref.dlg.lbl.msg4"), JOptionPane.INFORMATION_MESSAGE, null);
-		} else {
-			UpdateInfoDialog infoDialog = new UpdateInfoDialog(info);
-			infoDialog.setVisible(true);
-			if (infoDialog.isReminderSelected()) {
-				preferences.putString(SwingPreferences.LAST_UPDATE, "");
-			} else {
-				preferences.putString(SwingPreferences.LAST_UPDATE, info.getLatestVersion());
-			}
+					trans.get("update.dlg.error.title"), JOptionPane.WARNING_MESSAGE, null);
+			return;
 		}
-		
+
+		// Something went wrong, but we know what went wrong
+		if (info.getException() != null) {
+			JOptionPane.showMessageDialog(this,
+					info.getException().getMessage(),
+					trans.get("update.dlg.exception.title"), JOptionPane.WARNING_MESSAGE, null);
+			return;
+		}
+
+		// Nothing went wrong (yay!)
+		ReleaseStatus status = info.getReleaseStatus();
+		ReleaseInfo release = info.getLatestRelease();
+
+		// Do nothing if the release is part of the ignore versions
+		if (preferences.getIgnoreUpdateVersions().contains(release.getReleaseName())) {
+			return;
+		}
+
+		// Display software updater dialog, based on the current build version status
+		switch (status) {
+			case LATEST:
+				JOptionPane.showMessageDialog(this,
+						//// You are running the latest version of OpenRocket.
+						String.format(trans.get("update.dlg.latestVersion"), BuildProperties.getVersion()),
+						//// No updates available
+						trans.get("update.dlg.latestVersion.title"), JOptionPane.INFORMATION_MESSAGE, null);
+				break;
+			case NEWER:
+				JOptionPane.showMessageDialog(this,
+						//// You are running a newer version than the latest official release
+						String.format("<html><body><p style='width: %dpx'>%s", 400, String.format(trans.get("update.dlg.newerVersion"),
+								BuildProperties.getVersion(), release.getReleaseName())),
+						//// Newer version detected
+						trans.get("update.dlg.newerVersion.title"), JOptionPane.INFORMATION_MESSAGE, null);
+				break;
+			case OLDER:
+				UpdateInfoDialog infoDialog = new UpdateInfoDialog(info);
+				infoDialog.setVisible(true);
+		}
 	}
-	
 }

@@ -35,8 +35,8 @@ public class PhotoSettings extends AbstractChangeSource implements FlameSettings
 	private double exhaustScale = 1.0;
 	private double flameAspectRatio = 1.0;
 	
-	private double sparkConcentration;
-	private double sparkWeight;
+	private double sparkConcentration = 0.2;
+	private double sparkWeight = 0;
 	
 	private Sky sky = Mountains.instance;
 	
@@ -203,18 +203,22 @@ public class PhotoSettings extends AbstractChangeSource implements FlameSettings
 	}
 	
 	public void setSmokeColor(Color smokeColor) {
-		smokeColor.setAlpha(this.smokeColor.getAlpha());
 		this.smokeColor = smokeColor;
 		fireChangeEvent();
 	}
-	
-	public double getSmokeAlpha() {
-		return smokeColor.getAlpha() / 255f;
-	}
+
 	
 	public void setSmokeAlpha(double alpha) {
 		smokeColor.setAlpha((int) (alpha * 255));
 		fireChangeEvent();
+	}
+
+	public double getSmokeOpacity() {
+		return smokeColor.getAlpha() / 255f;
+	}
+
+	public void setSmokeOpacity(double smokeOpacity) {
+		setSmokeAlpha(smokeOpacity);
 	}
 	
 	public boolean isSparks() {

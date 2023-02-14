@@ -1,19 +1,19 @@
 package net.sf.openrocket.gui.util;
 
+import net.sf.openrocket.document.Simulation;
+import net.sf.openrocket.l10n.Translator;
+import net.sf.openrocket.startup.Application;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.swing.*;
+import java.awt.Component;
+import java.awt.Graphics;
+import java.awt.Image;
 import java.net.URL;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-
-import javax.swing.Icon;
-import javax.swing.ImageIcon;
-
-import net.sf.openrocket.document.Simulation;
-import net.sf.openrocket.l10n.Translator;
-import net.sf.openrocket.startup.Application;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class Icons {
@@ -33,7 +33,7 @@ public class Icons {
 		map.put(Simulation.Status.NOT_SIMULATED, loadImageIcon("pix/spheres/gray-16x16.png", "Not simulated"));
 		map.put(Simulation.Status.CANT_RUN, loadImageIcon("pix/spheres/yellow-16x16.png", "Can't run, no motors assigned."));
 		map.put(Simulation.Status.UPTODATE, loadImageIcon("pix/spheres/green-16x16.png", "Up to date"));
-		map.put(Simulation.Status.LOADED, loadImageIcon("pix/spheres/yellow-16x16.png", "Loaded from file"));
+		map.put(Simulation.Status.LOADED, loadImageIcon("pix/spheres/green-16x16.png", "Up to date"));
 		map.put(Simulation.Status.OUTDATED, loadImageIcon("pix/spheres/red-16x16.png", "Out-of-date"));
 		map.put(Simulation.Status.EXTERNAL, loadImageIcon("pix/spheres/blue-16x16.png", "Imported data"));
 		SIMULATION_STATUS_ICON_MAP = Collections.unmodifiableMap(map);
@@ -52,17 +52,26 @@ public class Icons {
 	public static final Icon FILE_OPEN_EXAMPLE = loadImageIcon("pix/icons/document-open-example.png", "Open example document");
 	public static final Icon FILE_SAVE = loadImageIcon("pix/icons/document-save.png", "Save document");
 	public static final Icon FILE_SAVE_AS = loadImageIcon("pix/icons/document-save-as.png", "Save document as");
-	public static final Icon FILE_PRINT = loadImageIcon("pix/icons/document-print.png", "Print document");
+	public static final Icon SAVE_DECAL = loadImageIcon("pix/icons/Painting-Transparent-PNG_16.png", "Save decal image");
+	public static final Icon FILE_PRINT = loadImageIcon("pix/icons/print-design.specs.png", "Print specifications");
+//	public static final Icon FILE_IMPORT = loadImageIcon("pix/icons/model_import.png", "Import");
+	public static final Icon FILE_EXPORT_AS = loadImageIcon("pix/icons/model_export.png", "Export model as");
+	public static final Icon ENCODE_3D = loadImageIcon("pix/icons/model_encode3d.png", "Encode 3D");
 	public static final Icon FILE_CLOSE = loadImageIcon("pix/icons/document-close.png", "Close document");
 	public static final Icon FILE_QUIT = loadImageIcon("pix/icons/application-exit.png", "Quit OpenRocket");
-	
 	public static final Icon EDIT_UNDO = loadImageIcon("pix/icons/edit-undo.png", trans.get("Icons.Undo"));
 	public static final Icon EDIT_REDO = loadImageIcon("pix/icons/edit-redo.png", trans.get("Icons.Redo"));
+	public static final Icon EDIT_EDIT = loadImageIcon("pix/icons/edit-edit.png", "Edit");
+	public static final Icon EDIT_RENAME = loadImageIcon("pix/icons/edit-rename.png", "Rename");
 	public static final Icon EDIT_CUT = loadImageIcon("pix/icons/edit-cut.png", "Cut");
 	public static final Icon EDIT_COPY = loadImageIcon("pix/icons/edit-copy.png", "Copy");
 	public static final Icon EDIT_PASTE = loadImageIcon("pix/icons/edit-paste.png", "Paste");
+	public static final Icon EDIT_DUPLICATE = loadImageIcon("pix/icons/edit-duplicate.png", "Duplicate");
 	public static final Icon EDIT_DELETE = loadImageIcon("pix/icons/edit-delete.png", "Delete");
 	public static final Icon EDIT_SCALE = loadImageIcon("pix/icons/edit-scale.png", "Scale");
+
+	public static final Icon SIM_RUN = loadImageIcon("pix/icons/sim-run.png", "Run");
+	public static final Icon SIM_PLOT = loadImageIcon("pix/icons/sim-plot.png", "Plot");
 	
 	public static final Icon HELP_ABOUT = loadImageIcon("pix/icons/help-about.png", "About");
 	public static final Icon HELP_LICENSE = loadImageIcon("pix/icons/help-license.png", "License");
@@ -76,8 +85,6 @@ public class Icons {
 	
 	public static final Icon PREFERENCES = loadImageIcon("pix/icons/preferences.png", "Preferences");
 	
-	public static final Icon DELETE = loadImageIcon("pix/icons/delete.png", "Delete");
-	public static final Icon EDIT = loadImageIcon("pix/icons/pencil.png", "Edit");
 	public static final Icon CONFIGURE = loadImageIcon("pix/icons/configure.png", "Configure");
 	public static final Icon HELP = loadImageIcon("pix/icons/help-about.png", "Help");
 	public static final Icon UP = loadImageIcon("pix/icons/up.png", "Up");
@@ -87,9 +94,17 @@ public class Icons {
 	public static final Icon FAVORITE = loadImageIcon("pix/icons/star_gold.png", "Favorite");
 	
 	public static final Icon CG_OVERRIDE = loadImageIcon("pix/icons/cg-override.png", "CG Override");
+	public static final Icon CG_OVERRIDE_SUBCOMPONENT = loadImageIcon("pix/icons/cg-override-subcomponent.png", "CG Override Subcomponent");
+	public static final Icon CD_OVERRIDE = loadImageIcon("pix/icons/cd-override.png", "CD Override");
+	public static final Icon CD_OVERRIDE_SUBCOMPONENT = loadImageIcon("pix/icons/cd-override-subcomponent.png", "CD Override Subcomponent");
 	public static final Icon MASS_OVERRIDE = loadImageIcon("pix/icons/mass-override.png", "Mass Override");
-	
-	
+	public static final Icon MASS_OVERRIDE_SUBCOMPONENT = loadImageIcon("pix/icons/mass-override-subcomponent.png", "Mass Override Subcomponent");
+
+// MANUFACTURERS ICONS
+	public static final Icon RASAERO_ICON = loadImageIcon("pix/icons/RASAero_16.png", "RASAero Icon");
+	public static final Icon ROCKSIM_ICON = loadImageIcon("pix/icons/Rocksim_16.png", "Rocksim Icon");
+
+
 	static {
 		log.debug("Icons loaded");
 	}
@@ -101,7 +116,7 @@ public class Icons {
 	 * 
 	 * @param file	the file to load.
 	 * @param name	the description of the icon.
-	 * @return		the ImageIcon, or null if could not be loaded (after the user closes the dialog)
+	 * @return		the ImageIcon, or null if the ImageIcon could not be loaded (after the user closes the dialog)
 	 */
 	public static ImageIcon loadImageIcon(String file, String name) {
 		if (System.getProperty("openrocket.unittest") != null) {
@@ -114,5 +129,34 @@ public class Icons {
 			return null;
 		}
 		return new ImageIcon(url, name);
+	}
+
+	/**
+	 * Scales an ImageIcon to the specified scale.
+	 * @param icon icon to scale
+	 * @param scale the scale to scale to (1 = no scale, < 1 = smaller, > 1 = bigger)
+	 * @return scaled down icon. If <icon> is not an ImageIcon, the original icon is returned.
+	 */
+	public static Icon getScaledIcon(Icon icon, final double scale) {
+		if (!(icon instanceof ImageIcon)) {
+			return icon;
+		}
+		final Image image = ((ImageIcon) icon).getImage();
+		return new ImageIcon(image) {
+			@Override
+			public int getIconWidth() {
+				return (int)(image.getWidth(null) * scale);
+			}
+
+			@Override
+			public int getIconHeight() {
+				return (int)(image.getHeight(null) * scale);
+			}
+
+			@Override
+			public void paintIcon(Component c, Graphics g, int x, int y) {
+				g.drawImage(image, x, y, getIconWidth(), getIconHeight(), c);
+			}
+		};
 	}
 }

@@ -18,7 +18,6 @@ public abstract class Warning {
 		return new Warning.Other(text);
 	}
 	
-	
 	/**
 	 * Return <code>true</code> if the <code>other</code> warning should replace
 	 * this warning.  The method should return <code>true</code> if the other
@@ -61,7 +60,7 @@ public abstract class Warning {
 	 * @author Sampo Niskanen <sampo.niskanen@iki.fi>
 	 */
 	public static class LargeAOA extends Warning {
-		private double aoa;
+		private final double aoa;
 		
 		/**
 		 * Sole constructor.  The argument is the AOA that caused this warning.
@@ -100,7 +99,7 @@ public abstract class Warning {
 	 * @author Craig Earls <enderw88@gmail.com>
 	 */
 	public static class HighSpeedDeployment extends Warning {
-		private double recoverySpeed;
+		private final double recoverySpeed;
 		
 		/**
 		 * Sole constructor.  The argument is the speed that caused this warning.
@@ -130,7 +129,7 @@ public abstract class Warning {
 	 *
 	 */
 	public static class EventAfterLanding extends Warning {
-		private FlightEvent event;
+		private final FlightEvent event;
 		
 		/**
 		 * Sole constructor.  The argument is an event which has occurred after landing
@@ -324,7 +323,7 @@ public abstract class Warning {
 	 * @author Sampo Niskanen <sampo.niskanen@iki.fi>
 	 */
 	public static class Other extends Warning {
-		private String description;
+		private final String description;
 		
 		public Other(String description) {
 			this.description = description;
@@ -359,6 +358,21 @@ public abstract class Warning {
 	/** A <code>Warning</code> that the body diameter is discontinuous. */
 	////Discontinuity in rocket body diameter.
 	public static final Warning DIAMETER_DISCONTINUITY = new Other(trans.get("Warning.DISCONTINUITY"));
+
+	/** A <code>Warning</code> that a ComponentAssembly has an open forward end */	
+	public static final Warning OPEN_AIRFRAME_FORWARD = new Other(trans.get("Warning.OPEN_AIRFRAME_FORWARD"));
+
+	/** A <code>Warning</code> that there is a gap in the airframe */
+	public static final Warning AIRFRAME_GAP = new Other(trans.get("Warning.AIRFRAME_GAP"));
+
+	/** A <code>Warning</code> that there are overlapping airframe components */
+	public static final Warning AIRFRAME_OVERLAP = new Other(trans.get("Warning.AIRFRAME_OVERLAP"));
+
+	/** A <code>Warning</code> that an inline podset is completely forward of its parent component */
+	public static final Warning PODSET_FORWARD = new Other(trans.get("Warning.PODSET_FORWARD"));
+
+	/** A <code>Warning</code> that an inline podset overlaps its parent component */
+	public static final Warning PODSET_OVERLAP = new Other(trans.get("Warning.PODSET_OVERLAP"));
 	
 	/** A <code>Warning</code> that the fins are thick compared to the rocket body. */
 	////Thick fins may not be modeled accurately.
@@ -375,6 +389,8 @@ public abstract class Warning {
 	////Recovery device opened while motor still burning.
 	public static final Warning RECOVERY_DEPLOYMENT_WHILE_BURNING = new Other(trans.get("Warning.RECOVERY_DEPLOYMENT_WHILE_BURNING"));
 	
+	////No recovery device for simulation
+	public static final Warning NO_RECOVERY_DEVICE = new Other(trans.get("Warning.NO_RECOVERY_DEVICE"));
 	
 	//// Invalid parameter encountered, ignoring.
 	public static final Warning FILE_INVALID_PARAMETER = new Other(trans.get("Warning.FILE_INVALID_PARAMETER"));
@@ -389,7 +405,12 @@ public abstract class Warning {
 
 	public static final Warning EVENT_AFTER_LANDING = new Other(trans.get("Warning.EVENT_AFTER_LANDING"));
 
-	public static final Warning ZERO_LENGTH_BODY = new Other(trans.get("Warning.ZERO_LENGTH_BODY"));
-	public static final Warning ZERO_RADIUS_BODY = new Other(trans.get("Warning.ZERO_RADIUS_BODY"));
+	public static final Warning ZERO_VOLUME_BODY = new Other(trans.get("Warning.ZERO_VOLUME_BODY"));
 
+	public static final Warning TUBE_SEPARATION = new Other(trans.get("Warning.TUBE_SEPARATION"));
+	public static final Warning TUBE_OVERLAP = new Other(trans.get("Warning.TUBE_OVERLAP"));
+
+	public static final Warning SEPARATION_ORDER = new Other(trans.get("Warning.SEPARATION_ORDER"));
+
+	public static final Warning EMPTY_BRANCH = new Other(trans.get("Warning.EMPTY_BRANCH"));
 }

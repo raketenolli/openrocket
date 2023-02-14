@@ -80,7 +80,7 @@ public class PhotoPanel extends JPanel implements GLEventListener {
 	private PhotoSettings p;
 	private OpenRocketDocument document;
 	private DocumentChangeListener changeListener;
-	
+
 	interface ImageCallback {
 		public void performAction(BufferedImage i);
 	}
@@ -94,11 +94,12 @@ public class PhotoPanel extends JPanel implements GLEventListener {
 		document = doc;
 		cachedBounds = null;
 		this.configuration = doc.getSelectedConfiguration();
-		
+
 		changeListener = new DocumentChangeListener() {
 			@Override
 			public void documentChanged(DocumentChangeEvent event) {
 				log.debug("Repainting on document change");
+				configuration = doc.getSelectedConfiguration();
 				needUpdate = true;
 				PhotoPanel.this.repaint();
 			}
@@ -121,15 +122,15 @@ public class PhotoPanel extends JPanel implements GLEventListener {
 		changeListener = null;
 		document = null;
 	}
-	
+
 	PhotoSettings getSettings() {
 		return p;
 	}
 
-	PhotoPanel() {
+	PhotoPanel(OpenRocketDocument document, PhotoSettings p) {
+    	this.p = p;
 		this.setLayout(new BorderLayout());
-
-		p = new PhotoSettings();
+		PhotoPanel.this.configuration = document.getSelectedConfiguration();
 
 		// Fixes a linux / X bug: Splash must be closed before GL Init
 		SplashScreen splash = Splash.getSplashScreen();
@@ -393,7 +394,7 @@ public class PhotoPanel extends JPanel implements GLEventListener {
 
 		gl.glTranslated(dx - p.getAdvance(), 0, 0);
 
-		if (p.isFlame()) {
+		if (p.isFlame() && configuration.hasMotors()) {
 			convertColor(p.getFlameColor(), color);
 
 			gl.glLightfv(GLLightingFunc.GL_LIGHT2, GLLightingFunc.GL_AMBIENT,
@@ -416,34 +417,34 @@ public class PhotoPanel extends JPanel implements GLEventListener {
 		}
 
 		rr.render(drawable, configuration, new HashSet<RocketComponent>());
-		
+
 		//Figure out the lowest stage shown
 
 		AxialStage bottomStage = configuration.getBottomStage();
 		int bottomStageNumber = 0;
 		if (bottomStage != null)
-			bottomStage.getStageNumber();
+			bottomStageNumber = bottomStage.getStageNumber();
 		//final int currentStageNumber = configuration.getActiveStages()[configuration.getActiveStages().length-1];
 		//final AxialStage currentStage = (AxialStage)configuration.getRocket().getChild( bottomStageNumber);
-		
+
 		final FlightConfigurationId motorID = configuration.getFlightConfigurationID();
-		
-		
-		
+
+
+
 		final Iterator<MotorConfiguration> iter = configuration.getActiveMotors().iterator();
 		while( iter.hasNext()){
 			MotorConfiguration curConfig = iter.next();
 			final MotorMount mount = curConfig.getMount();
 			int curStageNumber = ((RocketComponent)mount).getStageNumber();
-			
+
 			//If this mount is not in currentStage continue on to the next one.
 			if( curStageNumber != bottomStageNumber ){
 				continue;
 			}
-			
+
 			final Motor motor = mount.getMotorConfig(motorID).getMotor();
 			final double length = motor.getLength();
-	
+
 			Coordinate[] position = ((RocketComponent) mount)
 					.toAbsolute(new Coordinate(((RocketComponent) mount)
 							.getLength() + mount.getMotorOverhang() - length));

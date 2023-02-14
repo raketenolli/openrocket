@@ -26,7 +26,7 @@ import net.sf.openrocket.util.MathUtil;
  *
  * @author Sampo Niskanen <sampo.niskanen@iki.fi>
  */
-public class InnerTube extends ThicknessRingComponent implements AxialPositionable, BoxBounded, Clusterable, RadialParent, MotorMount {
+public class InnerTube extends ThicknessRingComponent implements AxialPositionable, BoxBounded, Clusterable, RadialParent, MotorMount, InsideColorComponent {
 	private static final Translator trans = Application.getTranslator();
 	private static final Logger log = LoggerFactory.getLogger(InnerTube.class);
 	
@@ -37,6 +37,8 @@ public class InnerTube extends ThicknessRingComponent implements AxialPositionab
 	private double overhang = 0;
 	private boolean isActingMount;
 	private MotorConfigurationSet motors;
+
+	private InsideColorComponentHandler insideColorComponentHandler = new InsideColorComponentHandler(this);
 	
 	/**
 	 * Main constructor.
@@ -130,6 +132,12 @@ public class InnerTube extends ThicknessRingComponent implements AxialPositionab
 	 */
 	@Override
 	public void setClusterConfiguration( final ClusterConfiguration cluster) {
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof InnerTube) {
+				((InnerTube) listener).setClusterConfiguration(cluster);
+			}
+		}
+
 		if( cluster == this.cluster){
 			// no change
 			return;
@@ -183,6 +191,13 @@ public class InnerTube extends ThicknessRingComponent implements AxialPositionab
 	 */
 	public void setClusterScale(double scale) {
 		scale = Math.max(scale, 0);
+
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof InnerTube) {
+				((InnerTube) listener).setClusterScale(scale);
+			}
+		}
+
 		if (MathUtil.equals(clusterScale, scale))
 			return;
 		clusterScale = scale;
@@ -203,6 +218,12 @@ public class InnerTube extends ThicknessRingComponent implements AxialPositionab
 	 * @param rotation the clusterRotation to set
 	 */
 	public void setClusterRotation(double rotation) {
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof InnerTube) {
+				((InnerTube) listener).setClusterRotation(rotation);
+			}
+		}
+
 		rotation = MathUtil.reducePi(rotation);
 		if (clusterRotation == rotation)
 			return;
@@ -286,6 +307,12 @@ public class InnerTube extends ThicknessRingComponent implements AxialPositionab
 
 	@Override 
 	public void setMotorConfig( final MotorConfiguration newMotorConfig, final FlightConfigurationId fcid){
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof InnerTube) {
+				((InnerTube) listener).setMotorConfig(newMotorConfig, fcid);
+			}
+		}
+
 		if((null == newMotorConfig)){
 			this.motors.set( fcid, null);
 		}else{
@@ -297,9 +324,6 @@ public class InnerTube extends ThicknessRingComponent implements AxialPositionab
 		}
 
 		this.isActingMount = true;
-
-		// this is done automatically in the motorSet
-		//fireComponentChangeEvent(ComponentChangeEvent.MOTOR_CHANGE);
 	}
 	
 	@Override
@@ -319,6 +343,12 @@ public class InnerTube extends ThicknessRingComponent implements AxialPositionab
 	
 	@Override
     public void setMotorMount(boolean _active){
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof InnerTube) {
+				((InnerTube) listener).setMotorMount(_active);
+			}
+		}
+
     	if (this.isActingMount == _active)
     		return;
     	this.isActingMount = _active;
@@ -354,6 +384,12 @@ public class InnerTube extends ThicknessRingComponent implements AxialPositionab
 	
 	@Override
 	public void setMotorOverhang(double overhang) {
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof InnerTube) {
+				((InnerTube) listener).setMotorOverhang(overhang);
+			}
+		}
+
 		if (MathUtil.equals(this.overhang, overhang))
 			return;
 		this.overhang = overhang;
@@ -399,6 +435,7 @@ public class InnerTube extends ThicknessRingComponent implements AxialPositionab
 	 */
 	public static InnerTube makeIndividualClusterComponent(Coordinate coord, String splitName, RocketComponent theInnerTube) {
 		InnerTube copy = (InnerTube) theInnerTube.copy();
+		copy.clearConfigListeners();
 		copy.setClusterConfiguration(ClusterConfiguration.SINGLE);
 		copy.setClusterRotation(0.0);
 		copy.setClusterScale(1.0);
@@ -410,6 +447,43 @@ public class InnerTube extends ThicknessRingComponent implements AxialPositionab
 	@Override
 	public String toMotorDebug( ){
 		return this.motors.toDebug();
+	}
+
+	@Override
+	public InsideColorComponentHandler getInsideColorComponentHandler() {
+		return this.insideColorComponentHandler;
+	}
+
+	@Override
+	public void setInsideColorComponentHandler(InsideColorComponentHandler handler) {
+		this.insideColorComponentHandler = handler;
+	}
+
+	@Override
+	public boolean addConfigListener(RocketComponent listener) {
+		boolean success = super.addConfigListener(listener);
+		if (listener instanceof InnerTube) {
+			MotorConfiguration config = ((InnerTube) listener).getDefaultMotorConfig();
+			success = success && getDefaultMotorConfig().addConfigListener(config);
+			return success;
+		}
+		return false;
+	}
+
+	@Override
+	public void removeConfigListener(RocketComponent listener) {
+		super.removeConfigListener(listener);
+		if (listener instanceof InnerTube) {
+			MotorConfiguration config = ((InnerTube) listener).getDefaultMotorConfig();
+			getDefaultMotorConfig().removeConfigListener(config);
+		}
+	}
+
+	@Override
+	public void clearConfigListeners() {
+		super.clearConfigListeners();
+		// The motor config also has listeners, so clear them as well
+		getDefaultMotorConfig().clearConfigListeners();
 	}
 	
 }

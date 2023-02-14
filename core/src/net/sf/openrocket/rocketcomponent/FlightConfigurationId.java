@@ -12,9 +12,9 @@ public final class FlightConfigurationId implements Comparable<FlightConfigurati
 	
 	private final static long DEFAULT_MOST_SIG_BITS = 0xF4F2F1F0;
 	private final static UUID ERROR_UUID = new UUID( DEFAULT_MOST_SIG_BITS, 2489);
-	private final static String ERROR_KEY_NAME = "ErrorKey".intern();
+	private final static String ERROR_KEY_NAME = "ErrorKey";
 	private final static UUID DEFAULT_VALUE_UUID = new UUID( DEFAULT_MOST_SIG_BITS, 5676);
-	private final static String DEFAULT_VALUE_NAME = "DefaultKey".intern();
+	private final static String DEFAULT_VALUE_NAME = "DefaultKey";
 	
 	public final static FlightConfigurationId ERROR_FCID = new FlightConfigurationId( FlightConfigurationId.ERROR_UUID);
 	public final static FlightConfigurationId DEFAULT_VALUE_FCID = new FlightConfigurationId( FlightConfigurationId.DEFAULT_VALUE_UUID ); 
@@ -28,7 +28,7 @@ public final class FlightConfigurationId implements Comparable<FlightConfigurati
 	
 	/**
 	 * builds the id with the given String
-	 * @param _str	te string to be made into the id
+	 * @param _str	the string to be made into the id
 	 */
 	public FlightConfigurationId(final String _str) {
 		UUID candidate;
@@ -83,12 +83,11 @@ public final class FlightConfigurationId implements Comparable<FlightConfigurati
 		
 	}
 
-	//extracted this method because maybe, just maybe, this info could be used somewhere else
 	/**
 	 * gets if the id is the default
 	 * @return	if the id is default
 	 */
-	private boolean isDefaultId() {
+	public boolean isDefaultId() {
 		return this.key == FlightConfigurationId.DEFAULT_VALUE_UUID;
 	}
 	

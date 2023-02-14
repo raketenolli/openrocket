@@ -17,6 +17,9 @@ import java.awt.geom.Rectangle2D;
 import java.util.*;
 import java.util.Map.Entry;
 
+import net.sf.openrocket.rocketcomponent.AxialStage;
+import net.sf.openrocket.rocketcomponent.ParallelStage;
+import net.sf.openrocket.rocketcomponent.PodSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,7 +29,6 @@ import net.sf.openrocket.gui.util.ColorConversion;
 import net.sf.openrocket.gui.util.SwingPreferences;
 import net.sf.openrocket.motor.Motor;
 import net.sf.openrocket.motor.MotorConfiguration;
-import net.sf.openrocket.rocketcomponent.ComponentAssembly;
 import net.sf.openrocket.rocketcomponent.FlightConfiguration;
 import net.sf.openrocket.rocketcomponent.InstanceContext;
 import net.sf.openrocket.rocketcomponent.MotorMount;
@@ -52,12 +54,14 @@ import net.sf.openrocket.util.Transformation;
 public class RocketFigure extends AbstractScaleFigure {
 
     private final static Logger log = LoggerFactory.getLogger(FinPointFigure.class);
+	protected final SwingPreferences preferences = (SwingPreferences) Application.getPreferences();
 	
 	private static final String ROCKET_FIGURE_PACKAGE = "net.sf.openrocket.gui.rocketfigure";
 	private static final String ROCKET_FIGURE_SUFFIX = "Shapes";
-	
-	public static final int VIEW_SIDE=0;
-	public static final int VIEW_BACK=1;
+
+	public static final int VIEW_TOP = 0;
+	public static final int VIEW_SIDE = 1;
+	public static final int VIEW_BACK = 2;
 	
 	// Width for drawing normal and selected components
 	public static final double NORMAL_WIDTH = 1.0;
@@ -72,6 +76,8 @@ public class RocketFigure extends AbstractScaleFigure {
 	
 	private double rotation;
 	private Transformation axialRotation;
+
+	private boolean drawCarets = true;
     
 	/**
 	 * The shapes to be drawn are stored in this Priority Queue, where the first shape to be drawn is the one with
@@ -125,10 +131,6 @@ public class RocketFigure extends AbstractScaleFigure {
 		return rotation;
 	}
 	
-	public Transformation getRotateTransformation() {
-		return axialRotation;
-	}
-	
 	public void setRotation(double rot) {
 		if (MathUtil.equals(rotation, rot))
 			return;
@@ -137,14 +139,22 @@ public class RocketFigure extends AbstractScaleFigure {
 		updateFigure();
         fireChangeEvent();
 	}
+
+	private Transformation getFigureRotation() {
+		if (currentViewType == RocketPanel.VIEW_TYPE.TopView) {
+			return this.axialRotation.applyTransformation(Transformation.rotate_x(-Math.PI / 2));
+		} else {
+			return this.axialRotation;
+		}
+	}
 	
 	
-	public RocketPanel.VIEW_TYPE  getType() {
+	public RocketPanel.VIEW_TYPE getCurrentViewType() {
 		return currentViewType;
 	}
 	
 	public void setType(final RocketPanel.VIEW_TYPE type) {
-		if (type != RocketPanel.VIEW_TYPE.BackView && type != RocketPanel.VIEW_TYPE.SideView) {
+		if (type != RocketPanel.VIEW_TYPE.BackView && type != RocketPanel.VIEW_TYPE.SideView && type != RocketPanel.VIEW_TYPE.TopView) {
 			throw new IllegalArgumentException("Illegal type: " + type);
 		}
 		if (this.currentViewType == type)
@@ -196,7 +206,7 @@ public class RocketFigure extends AbstractScaleFigure {
 		AffineTransform baseTransform = g2.getTransform();
 
 		PriorityQueue<RocketComponentShape> figureShapes;
-		if (currentViewType == RocketPanel.VIEW_TYPE.SideView)
+		if (currentViewType == RocketPanel.VIEW_TYPE.SideView || currentViewType == RocketPanel.VIEW_TYPE.TopView)
 			figureShapes = figureShapes_side;
 		else if (currentViewType == RocketPanel.VIEW_TYPE.BackView)
 			figureShapes = figureShapes_back;
@@ -277,38 +287,38 @@ public class RocketFigure extends AbstractScaleFigure {
 		Color borderColor = ((SwingPreferences)Application.getPreferences()).getMotorBorderColor();
 
 		FlightConfiguration config = rocket.getSelectedConfiguration();
-		for( MotorConfiguration curInstance : config.getActiveMotors()){
+		for (MotorConfiguration curInstance : config.getActiveMotors()) {
 			MotorMount mount = curInstance.getMount();
 			Motor motor = curInstance.getMotor();
 			double motorLength = motor.getLength();
 			double motorRadius = motor.getDiameter() / 2;
 			RocketComponent mountComponent = ((RocketComponent) mount);
-			
+
 			// <component>.getLocation() will return all the parent instances of this owning component,  AND all of it's own instances as well.
 			// so, just draw a motor once for each Coordinate returned... 
 			Coordinate[] mountLocations = mount.getLocations();
-			
+
 			double mountLength = mountComponent.getLength();
 //			System.err.println("Drawing Motor: "+motor.getDesignation()+" (x"+mountLocations.length+")");
-			for ( Coordinate curMountLocation : mountLocations ){
-			    Coordinate curMotorLocation = curMountLocation.add( mountLength - motorLength + mount.getMotorOverhang(), 0, 0);
+			for (Coordinate curMountLocation : mountLocations) {
+				Coordinate curMotorLocation = curMountLocation.add(mountLength - motorLength + mount.getMotorOverhang(), 0, 0);
 //		        System.err.println(String.format("        mount instance:   %s  =>  %s", curMountLocation.toString(), curMotorLocation.toString() )); 
-	        
-		        // rotate by figure's axial rotation:
-		        curMotorLocation = this.axialRotation.transform(curMotorLocation);
+
+				// rotate by figure's axial rotation:
+				curMotorLocation = getFigureRotation().transform(curMotorLocation);
 
 				{
 					Shape s;
-					if (currentViewType == RocketPanel.VIEW_TYPE.SideView) {
-						s = new Rectangle2D.Double( curMotorLocation.x,
-                    							    (curMotorLocation.y - motorRadius), 
-                    								motorLength,
-                    								2 * motorRadius);
+					if (currentViewType == RocketPanel.VIEW_TYPE.SideView || currentViewType == RocketPanel.VIEW_TYPE.TopView) {
+						s = new Rectangle2D.Double(curMotorLocation.x,
+								(curMotorLocation.y - motorRadius),
+								motorLength,
+								2 * motorRadius);
 					} else {
 						s = new Ellipse2D.Double((curMotorLocation.z - motorRadius),
-								                 (curMotorLocation.y - motorRadius), 
-								                 2 * motorRadius,
-								                 2 * motorRadius);
+								(curMotorLocation.y - motorRadius),
+								2 * motorRadius,
+								2 * motorRadius);
 					}
 					g2.setColor(fillColor);
 					g2.fill(s);
@@ -320,9 +330,12 @@ public class RocketFigure extends AbstractScaleFigure {
 		
 
 		// Draw relative extras
-		for (FigureElement e : relativeExtra) {
-			e.paint(g2, scale);
+		if (drawCarets) {
+			for (FigureElement e : relativeExtra) {
+				e.paint(g2, scale);
+			}
 		}
+
 		
 		// Draw absolute extras
 		g2.setTransform(baseTransform);
@@ -346,7 +359,7 @@ public class RocketFigure extends AbstractScaleFigure {
 		LinkedHashSet<RocketComponent> l = new LinkedHashSet<RocketComponent>();
 
 		PriorityQueue<RocketComponentShape> figureShapes;
-		if (currentViewType == RocketPanel.VIEW_TYPE.SideView)
+		if (currentViewType == RocketPanel.VIEW_TYPE.SideView || currentViewType == RocketPanel.VIEW_TYPE.TopView)
 			figureShapes = figureShapes_side;
 		else if (currentViewType == RocketPanel.VIEW_TYPE.BackView)
 			figureShapes = figureShapes_back;
@@ -370,27 +383,46 @@ public class RocketFigure extends AbstractScaleFigure {
 
 		// allShapes is an output buffer -- it stores all the generated shapes
 		allShapes.clear();
-		
-		for(Entry<RocketComponent, ArrayList<InstanceContext>> entry: config.getActiveInstances().entrySet() ) {
+
+		addShapesFromInstanceEntries(allShapes, config.getActiveInstances().entrySet());
+		addShapesFromInstanceEntries(allShapes, config.getExtraRenderInstances().entrySet());
+	}
+
+	private void addShapesFromInstanceEntries(PriorityQueue<RocketComponentShape> allShapes, Set<Entry<RocketComponent, ArrayList<InstanceContext>>> entries) {
+		for (Entry<RocketComponent, ArrayList<InstanceContext>> entry : entries) {
 			final RocketComponent comp = entry.getKey();
-			
+
+			// Only draw pod sets and boosters when they are selected
+			if (preferences.isShowMarkers() && (comp instanceof PodSet || comp instanceof ParallelStage)) {
+				boolean selected = false;
+
+				// Check if component is in the selection
+				for (RocketComponent component : selection) {
+					if (comp == component) {
+						selected = true;
+						break;
+					}
+				}
+				if (!selected) continue;
+			}
+
 			final ArrayList<InstanceContext> contextList = entry.getValue();
 
-			for(InstanceContext context: contextList ) {
-				final Transformation currentTransform = this.axialRotation.applyTransformation(context.transform);
-				
-		        // generate shape for this component, if active
-		        if( context.active ) {
-		        	allShapes = addThisShape( allShapes, this.currentViewType, comp, currentTransform);
-		        }
+			for (InstanceContext context : contextList) {
+				final Transformation currentTransform = getFigureRotation().applyTransformation(context.transform);
+				allShapes = addThisShape(allShapes, this.currentViewType, comp, currentTransform);
 			}
-        }
+		}
 	}
-	
+
 	/**
 	 * Gets the shapes required to draw the component.
-	 * 
-	 * @param component
+	 *
+	 * @param allShapes output buffer for the shapes to add to
+	 * @param viewType the view type to draw the component in
+	 * @param component component to draw and add to <allShapes>
+	 * @param transformation transformation to apply to the component before drawing it
+	 * @param color color to draw the component in
 	 *
 	 * @return the <code>ArrayList</code> containing all the shapes to draw.
 	 */
@@ -398,10 +430,11 @@ public class RocketFigure extends AbstractScaleFigure {
 			PriorityQueue<RocketComponentShape> allShapes,  // this is the output parameter
 			final RocketPanel.VIEW_TYPE viewType, 
 			final RocketComponent component, 
-			final Transformation transformation) {
+			final Transformation transformation,
+			final net.sf.openrocket.util.Color color) {
 		Reflection.Method m;
 		
-		if(( component instanceof Rocket)||( component instanceof ComponentAssembly )){
+		if ((component instanceof Rocket) || (component instanceof AxialStage && !(component instanceof ParallelStage))){
 			// no-op; no shapes here
 			return allShapes;
 		}
@@ -409,9 +442,10 @@ public class RocketFigure extends AbstractScaleFigure {
 		// Find the appropriate method
 		switch (viewType) {
 		case SideView:
+		case TopView:
 			m = Reflection.findMethod(ROCKET_FIGURE_PACKAGE, component, ROCKET_FIGURE_SUFFIX, "getShapesSide",
 					RocketComponent.class, Transformation.class);
-			break;
+				break;
 		
 		case BackView:
 			m = Reflection.findMethod(ROCKET_FIGURE_PACKAGE, component, ROCKET_FIGURE_SUFFIX, "getShapesBack",
@@ -430,8 +464,34 @@ public class RocketFigure extends AbstractScaleFigure {
 		
 	
 		RocketComponentShape[] returnValue =  (RocketComponentShape[]) m.invokeStatic(component, transformation);
+
+		if (color != null) {
+			for (RocketComponentShape rcs : returnValue) {
+				if (rcs.getColor() == net.sf.openrocket.util.Color.INVISIBLE) continue;	// don't change the color of invisible (often selection) components
+				rcs.setColor(color);
+			}
+		}
+
 		allShapes.addAll(Arrays.asList(returnValue));
 		return allShapes;
+	}
+
+	/**
+	 * Gets the shapes required to draw the component.
+	 *
+	 * @param allShapes output buffer for the shapes to add to
+	 * @param viewType the view type to draw the component in
+	 * @param component component to draw and add to <allShapes>
+	 * @param transformation transformation to apply to the component before drawing it
+	 *
+	 * @return the <code>ArrayList</code> containing all the shapes to draw.
+	 */
+	private static PriorityQueue<RocketComponentShape> addThisShape(
+			PriorityQueue<RocketComponentShape> allShapes,  // this is the output parameter
+			final RocketPanel.VIEW_TYPE viewType,
+			final RocketComponent component,
+			final Transformation transformation) {
+		return addThisShape(allShapes, viewType, component, transformation, null);
 	}
 	
 
@@ -447,17 +507,15 @@ public class RocketFigure extends AbstractScaleFigure {
 	protected void updateSubjectDimensions() {
 		// calculate bounds, and store in class variables
 		
-		final FlightConfiguration config = rocket.getSelectedConfiguration().clone();
-		// Explicitly zoom & draw at a scale to fit the entire rocket, but only show the selected stages.
-		config.setAllStages();
-		final BoundingBox newBounds = config.getBoundingBox();
+		final BoundingBox bounds = rocket.getSelectedConfiguration().getBoundingBox();
 		
-		final double maxR = Math.max( Math.hypot(newBounds.min.y, newBounds.min.z),
-									  Math.hypot(newBounds.max.y, newBounds.max.z));
+		final double maxR = Math.max( Math.hypot(bounds.min.y, bounds.min.z),
+									  Math.hypot(bounds.max.y, bounds.max.z));
 
 		switch (currentViewType) {
 			case SideView:
-				subjectBounds_m = new Rectangle2D.Double(newBounds.min.x, -maxR, newBounds.span().x, 2 * maxR);
+			case TopView:
+				subjectBounds_m = new Rectangle2D.Double(bounds.min.x, -maxR, bounds.span().x, 2 * maxR);
 				break;
 			case BackView:
 				subjectBounds_m = new Rectangle2D.Double(-maxR, -maxR, 2 * maxR, 2 * maxR);
@@ -482,13 +540,20 @@ public class RocketFigure extends AbstractScaleFigure {
 		if (currentViewType == RocketPanel.VIEW_TYPE.BackView){
 			final int newOriginX = mid_x;
 			final int newOriginY = borderThickness_px.height + getHeight() / 2;
-			
 			originLocation_px = new Point(newOriginX, newOriginY);
-		}else if (currentViewType == RocketPanel.VIEW_TYPE.SideView){
-			final int newOriginX = mid_x - (subjectWidth / 2);
+		} else if (currentViewType == RocketPanel.VIEW_TYPE.SideView || currentViewType == RocketPanel.VIEW_TYPE.TopView) {
+			final int newOriginX = mid_x - (subjectWidth / 2) - (int)(subjectBounds_m.getMinX() * scale);
 			final int newOriginY = Math.max(getHeight(), subjectHeight + 2*borderThickness_px.height )/ 2;
 			originLocation_px = new Point(newOriginX, newOriginY);
 		}
+	}
+
+	public boolean isDrawCarets() {
+		return drawCarets;
+	}
+
+	public void setDrawCarets(boolean drawCarets) {
+		this.drawCarets = drawCarets;
 	}
 
 }

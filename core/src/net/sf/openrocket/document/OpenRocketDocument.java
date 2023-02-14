@@ -1,15 +1,10 @@
 package net.sf.openrocket.document;
 
 import java.io.File;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.LinkedHashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 import net.sf.openrocket.rocketcomponent.*;
+import net.sf.openrocket.util.StateChangeListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,9 +33,9 @@ import net.sf.openrocket.util.ArrayList;
  * 
  * @author Sampo Niskanen <sampo.niskanen@iki.fi>
  */
-public class OpenRocketDocument implements ComponentChangeListener {
+public class OpenRocketDocument implements ComponentChangeListener, StateChangeListener {
 	private static final Logger log = LoggerFactory.getLogger(OpenRocketDocument.class);
-	
+	private final List<String> file_extensions = Arrays.asList("ork", "ork.gz", "rkt", "rkt.gz");	// Possible extensions of an OpenRocket document
 	/**
 	 * The minimum number of undo levels that are stored.
 	 */
@@ -59,7 +54,10 @@ public class OpenRocketDocument implements ComponentChangeListener {
 	private final Rocket rocket;
 	
 	private final ArrayList<Simulation> simulations = new ArrayList<Simulation>();
-	private ArrayList<CustomExpression> customExpressions = new ArrayList<CustomExpression>();
+	private final ArrayList<CustomExpression> customExpressions = new ArrayList<CustomExpression>();
+
+	// The Photo Settings will be saved in the core module as a map of key values with corresponding content
+	private Map<String, String> photoSettings = new HashMap<>();
 	
 	/*
 	 * The undo/redo variables and mechanism are documented in doc/undo-redo-flow.*
@@ -69,8 +67,8 @@ public class OpenRocketDocument implements ComponentChangeListener {
 	 * The undo history of the rocket.   Whenever a new undo position is created while the
 	 * rocket is in "dirty" state, the rocket is copied here.
 	 */
-	private LinkedList<Rocket> undoHistory = new LinkedList<Rocket>();
-	private LinkedList<String> undoDescription = new LinkedList<String>();
+	private final LinkedList<Rocket> undoHistory = new LinkedList<Rocket>();
+	private final LinkedList<String> undoDescription = new LinkedList<String>();
 	
 	/**
 	 * The position in the undoHistory we are currently at.  If modifications have been
@@ -86,9 +84,10 @@ public class OpenRocketDocument implements ComponentChangeListener {
 	private String storedDescription = null;
 	
 	
-	private ArrayList<UndoRedoListener> undoRedoListeners = new ArrayList<UndoRedoListener>(2);
+	private final ArrayList<UndoRedoListener> undoRedoListeners = new ArrayList<UndoRedoListener>(2);
 	
 	private File file = null;
+	private int modID = -1;
 	private int savedID = -1;
 	
 	private final StorageOptions storageOptions = new StorageOptions();
@@ -123,13 +122,13 @@ public class OpenRocketDocument implements ComponentChangeListener {
 	 */
 	public void addCustomExpression(CustomExpression expression) {
 		if (customExpressions.contains(expression)) {
-			log.info(Markers.USER_MARKER, "Could not add custom expression " + expression.getName() + " to document as document alerady has a matching expression.");
+			log.info(Markers.USER_MARKER, "Could not add custom expression " + expression.getName() + " to document as document already has a matching expression.");
 		} 
 		customExpressions.add(expression);
 	}
 	
 	/**
-	 * remves
+	 * Removes custom expression from the document
 	 * @param expression
 	 */
 	public void removeCustomExpression(CustomExpression expression) {
@@ -196,6 +195,23 @@ public class OpenRocketDocument implements ComponentChangeListener {
 	public File getFile() {
 		return file;
 	}
+
+	/**
+	 * returns the File handler object for the document without the file extension (e.g. '.ork' removed)
+	 * @return the File handler object for the document without the file extension
+	 */
+	public File getFileNoExtension() {
+		if (file == null) return null;
+		int index = file.getAbsolutePath().lastIndexOf('.');
+		if (index > 0) {
+			String filename = file.getAbsolutePath().substring(0, index);
+			String extension = file.getAbsolutePath().substring(index + 1);
+			if (file_extensions.contains(extension)) {
+				return new File(filename);
+			}
+		}
+		return file;
+	}
 	
 	/**
 	 * set the file handler object for the document
@@ -210,7 +226,7 @@ public class OpenRocketDocument implements ComponentChangeListener {
 	 * @return	if the current rocket is saved
 	 */
 	public boolean isSaved() {
-		return rocket.getModID() == savedID;
+		return rocket.getModID() + modID == savedID;
 	}
 	
 	/**
@@ -218,10 +234,10 @@ public class OpenRocketDocument implements ComponentChangeListener {
 	 * @param saved	if the current rocket or none will be set to save
 	 */
 	public void setSaved(boolean saved) {
-		if (saved == false)
+		if (!saved)
 			this.savedID = -1;
 		else
-			this.savedID = rocket.getModID();
+			this.savedID = rocket.getModID() + modID;
 	}
 	
 	/**
@@ -421,7 +437,7 @@ public class OpenRocketDocument implements ComponentChangeListener {
 
 	/**
 	 * removes all simulations with the specific configId
-	 * @param configId	the Flight Configuration Id that dictates which simulations shoul be removed
+	 * @param configId	the Flight Configuration Id that dictates which simulations should be removed
 	 */
 	private void removeSimulations(FlightConfigurationId configId) {
 		for (Simulation s : getSimulations()) {
@@ -618,6 +634,12 @@ public class OpenRocketDocument implements ComponentChangeListener {
 		fireDocumentChangeEvent(new DocumentChangeEvent(e.getSource()));
 	}
 
+	@Override
+	public void stateChanged(EventObject e) {
+		modID++;
+		fireDocumentChangeEvent(new DocumentChangeEvent(e.getSource()));
+	}
+
 	/**
 	 * Sets the latest description
 	 */
@@ -713,9 +735,7 @@ public class OpenRocketDocument implements ComponentChangeListener {
 		}
 		
 		rocket.checkComponentStructure();
-		undoHistory.get(undoPosition).checkComponentStructure();
-		undoHistory.get(undoPosition).copyWithOriginalID().checkComponentStructure();
-		rocket.loadFrom(undoHistory.get(undoPosition).copyWithOriginalID());
+		rocket.loadFrom(undoHistory.get(undoPosition));
 		rocket.checkComponentStructure();
 	}
 	
@@ -813,7 +833,7 @@ public class OpenRocketDocument implements ComponentChangeListener {
 		listeners.remove(listener);
 	}
 	
-	protected void fireDocumentChangeEvent(DocumentChangeEvent event) {
+	public void fireDocumentChangeEvent(DocumentChangeEvent event) {
 		DocumentChangeListener[] array = listeners.toArray(new DocumentChangeListener[0]);
 		for (DocumentChangeListener l : array) {
 			l.documentChanged(event);
@@ -831,7 +851,12 @@ public class OpenRocketDocument implements ComponentChangeListener {
 		
 		return str.toString();
 	}
-	
-	
-	
+
+	public Map<String, String> getPhotoSettings() {
+		return photoSettings;
+	}
+
+	public void setPhotoSettings(Map<String, String> photoSettings) {
+		this.photoSettings = photoSettings;
+	}
 }

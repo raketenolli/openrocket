@@ -41,7 +41,7 @@ public class RocketInfo implements FigureElement {
 	private final Caret cpCaret = new CPCaret(0,0);
 	private final Caret cgCaret = new CGCaret(0,0);
 	
-	private final UnitGroup stabilityUnits;
+	private UnitGroup stabilityUnits;
 	
 	private FlightConfiguration configuration;
 	private double cg = 0, cp = 0;
@@ -53,6 +53,7 @@ public class RocketInfo implements FigureElement {
 	private double massWithoutMotors = 0;
 	
 	private WarningSet warnings = null;
+	private boolean showWarnings = true;
 	
 	private boolean calculatingData = false;
 	private FlightData flightData = null;
@@ -123,7 +124,15 @@ public class RocketInfo implements FigureElement {
 	public void setWarnings(WarningSet warnings) {
 		this.warnings = warnings.clone();
 	}
-	
+
+	/**
+	 * Set whether warnings should be shown. If false, the warnings are not shown.
+	 * @param showWarnings whether to show warnings.
+	 */
+	public void setShowWarnings(boolean showWarnings) {
+		this.showWarnings = showWarnings;
+	}
+
 	public void setAOA(double aoa) {
 		this.aoa = aoa;
 	}
@@ -182,7 +191,7 @@ public class RocketInfo implements FigureElement {
 	private void drawStabilityInfo() {
 		String at;
 		//// at M=
-		at = trans.get("RocketInfo.at")+UnitGroup.UNITS_COEFFICIENT.getDefaultUnit().toStringUnit(Application.getPreferences().getDefaultMach());
+		at = trans.get("RocketInfo.at")+UnitGroup.UNITS_COEFFICIENT.getDefaultUnit().toStringUnit(this.mach);
 		if (!Double.isNaN(aoa)) {
 			at += " "+ALPHA+"=" + UnitGroup.UNITS_ANGLE.getDefaultUnit().toStringUnit(aoa);
 		}
@@ -329,26 +338,35 @@ public class RocketInfo implements FigureElement {
 		if (warnings == null || warnings.isEmpty())
 			return;
 		
-		GlyphVector[] texts = new GlyphVector[warnings.size()+1];
+		final GlyphVector[] texts;
 		double max = 0;
-		
-		//// Warning:
-		texts[0] = createText(trans.get("RocketInfo.Warning"));
-		int i=1;
-		for (Warning w: warnings) {
-			texts[i] = createText(w.toString());
-			i++;
-		}
-		
-		for (GlyphVector v: texts) {
-			Rectangle2D rect = v.getVisualBounds();
-			if (rect.getWidth() > max)
-				max = rect.getWidth();
+
+		if (showWarnings) {
+			texts = new GlyphVector[warnings.size()+1];
+
+			//// Warning:
+			texts[0] = createText(trans.get("RocketInfo.Warning"));
+			int i = 1;
+			for (Warning w : warnings) {
+				texts[i] = createText(w.toString());
+				i++;
+			}
+
+			for (GlyphVector v : texts) {
+				Rectangle2D rect = v.getVisualBounds();
+				if (rect.getWidth() > max)
+					max = rect.getWidth();
+			}
+		} else {
+			texts = new GlyphVector[1];
+			texts[0] = createText(String.format(trans.get("RocketInfo.lbl.warnings"), warnings.size()));
+			Rectangle2D rect = texts[0].getVisualBounds();
+			max = rect.getWidth();
 		}
 		
 
-		float y = y2 - line * warnings.size();
-		g2.setColor(new Color(255,0,0,130));
+		float y = y2 - line * (texts.length-1);
+		g2.setColor(Color.RED);
 
 		for (GlyphVector v: texts) {
 			Rectangle2D rect = v.getVisualBounds();
@@ -459,5 +477,6 @@ public class RocketInfo implements FigureElement {
 	
 	public void setCurrentConfig(FlightConfiguration newConfig) {
 		this.configuration = newConfig;
+		this.stabilityUnits = UnitGroup.stabilityUnits(newConfig);
 	}
 }

@@ -33,8 +33,7 @@ import net.sf.openrocket.util.WorldCoordinate;
  */
 
 public class SimulationStatus implements Monitorable {
-	private static final Logger log = LoggerFactory.getLogger(SimulationStatus.class);
-	
+
 	private SimulationConditions simulationConditions;
 	private FlightConfiguration configuration;
 	private FlightDataBranch flightData;
@@ -46,6 +45,7 @@ public class SimulationStatus implements Monitorable {
 	private Coordinate position;
 	private WorldCoordinate worldPosition;
 	private Coordinate velocity;
+	private Coordinate acceleration;
 	
 	private Quaternion orientation;
 	private Coordinate rotationVelocity;
@@ -53,7 +53,7 @@ public class SimulationStatus implements Monitorable {
 	private double effectiveLaunchRodLength;
 	
 	// Set of all motors	
-	private List<MotorClusterState> motorStateList = new ArrayList<MotorClusterState>();
+	private final List<MotorClusterState> motorStateList = new ArrayList<MotorClusterState>();
 	 
 	
 	/** Nanosecond time when the simulation was started. */
@@ -79,7 +79,7 @@ public class SimulationStatus implements Monitorable {
 	private boolean landed = false;
 	
 	/** Contains a list of deployed recovery devices. */
-	private MonitorableSet<RecoveryDevice> deployedRecoveryDevices = new MonitorableSet<RecoveryDevice>();
+	private final MonitorableSet<RecoveryDevice> deployedRecoveryDevices = new MonitorableSet<RecoveryDevice>();
 	
 	/** The flight event queue */
 	private final EventQueue eventQueue = new EventQueue();
@@ -105,6 +105,7 @@ public class SimulationStatus implements Monitorable {
 		this.position = this.simulationConditions.getLaunchPosition();
 		this.velocity = this.simulationConditions.getLaunchVelocity();
 		this.worldPosition = this.simulationConditions.getLaunchSite();
+		this.acceleration = Coordinate.ZERO;
 		
 		// Initialize to roll angle with least stability w.r.t. the wind
 		Quaternion o;
@@ -175,6 +176,7 @@ public class SimulationStatus implements Monitorable {
 		this.time = orig.time;
 		this.previousTimeStep = orig.previousTimeStep;
 		this.position = orig.position;
+		this.acceleration = orig.acceleration;
 		this.worldPosition = orig.worldPosition;
 		this.velocity = orig.velocity;
 		this.orientation = orig.orientation;
@@ -300,7 +302,15 @@ public class SimulationStatus implements Monitorable {
 	public Coordinate getRocketVelocity() {
 		return velocity;
 	}
+
+	public void setRocketAcceleration(Coordinate acceleration) {
+		this.acceleration = acceleration;
+		this.modID++;
+	}
 	
+	public Coordinate getRocketAcceleration() {
+		return acceleration;
+	}
 	
 	public boolean moveBurntOutMotor( final MotorConfigurationId motor) {
 		// get motor from normal list
@@ -514,7 +524,7 @@ public class SimulationStatus implements Monitorable {
 	}
 	
 	public String toEventDebug(){
-		final StringBuilder buf = new StringBuilder("");
+		final StringBuilder buf = new StringBuilder();
 		for ( FlightEvent event : this.eventQueue){
 			buf.append("      [t:"+event.getType()+" @"+ event.getTime());
 			if( null != event.getSource()){

@@ -31,12 +31,12 @@ public class CustomExpression implements Cloneable {
 	
 	private static final Logger log = LoggerFactory.getLogger(CustomExpression.class);
 	
-	private OpenRocketDocument doc;
+	private final OpenRocketDocument doc;
 	private String name, symbol, unit;
 	
 	protected String expression;
 	private ExpressionBuilder builder;
-	private List<CustomExpression> subExpressions = new ArrayList<CustomExpression>();
+	private final List<CustomExpression> subExpressions = new ArrayList<CustomExpression>();
 	
 	public CustomExpression(OpenRocketDocument doc) {
 		this.doc = doc;
@@ -521,7 +521,7 @@ public class CustomExpression implements Cloneable {
 	 * Used for temporary substitution when evaluating index and range expressions.
 	 */
 	public String hash() {
-		Integer hashint = new Integer(this.getExpressionString().hashCode() + symbol.hashCode());
+		Integer hashint = Integer.valueOf(this.getExpressionString().hashCode() + symbol.hashCode());
 		String hash = "$";
 		for (char c : hashint.toString().toCharArray()) {
 			if (c == '-')

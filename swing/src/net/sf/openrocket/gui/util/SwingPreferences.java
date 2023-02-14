@@ -15,6 +15,7 @@ import java.util.Set;
 import java.util.prefs.BackingStoreException;
 import java.util.prefs.Preferences;
 
+import net.sf.openrocket.communication.AssetHandler.UpdatePlatform;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,7 +43,7 @@ public class SwingPreferences extends net.sf.openrocket.startup.Preferences {
 	private static final List<Locale> SUPPORTED_LOCALES;
 	static {
 		List<Locale> list = new ArrayList<Locale>();
-		for (String lang : new String[] { "en", "de", "es", "fr", "it", "nl", "ru", "cs", "pl", "ja", "pt", "tr" }) {
+		for (String lang : new String[] { "en", "ar", "de", "es", "fr", "it", "nl", "ru", "cs", "pl", "ja", "pt", "tr" }) {
 			list.add(new Locale(lang));
 		}
 		list.add(new Locale("zh", "CN"));
@@ -70,7 +71,7 @@ public class SwingPreferences extends net.sf.openrocket.startup.Preferences {
 	 */
 	private static final String NODENAME = (DEBUG ? "OpenRocket-debug" : "OpenRocket");
 	
-	private final Preferences PREFNODE;
+	private Preferences PREFNODE;
 	
 	
 	public SwingPreferences() {
@@ -92,7 +93,20 @@ public class SwingPreferences extends net.sf.openrocket.startup.Preferences {
 	
 	//////////////////////
 	
-	
+	public void clearPreferences() {
+		try {
+			Preferences root = Preferences.userRoot();
+			if (root.nodeExists(NODENAME)) {
+				root.node(NODENAME).removeNode();
+			}
+			PREFNODE = root.node(NODENAME);
+			UnitGroup.resetDefaultUnits();
+			storeDefaultUnits();
+			log.info("Cleared preferences");
+		} catch (BackingStoreException e) {
+			throw new BugException("Unable to clear preference node", e);
+		}
+	}
 	
 	/**
 	 * Store the current OpenRocket version into the preferences to allow for preferences migration.
@@ -247,7 +261,18 @@ public class SwingPreferences extends net.sf.openrocket.startup.Preferences {
 		}
 		return compdir;
 	}
-	
+
+	public void setUpdatePlatform(UpdatePlatform platform) {
+		if (platform == null) return;
+		putString("UpdatePlatform", platform.name());
+	}
+
+	public UpdatePlatform getUpdatePlatform() {
+		String p = getString("UpdatePlatform", SystemInfo.getPlatform().name());
+		if (p == null) return null;
+		return UpdatePlatform.valueOf(p);
+	}
+
 	/**
 	 * Return a list of files/directories to be loaded as custom thrust curves.
 	 * <p>
@@ -278,6 +303,24 @@ public class SwingPreferences extends net.sf.openrocket.startup.Preferences {
 		}
 		
 		return list;
+	}
+
+	/**
+	 * Returns the files/directories to be loaded as custom thrust curves, formatting as a string. If there are multiple
+	 * locations, they are separated by a semicolon.
+	 *
+	 * @return a list of files to load as thrust curves, formatted as a semicolon separated string.
+	 */
+	public String getUserThrustCurveFilesAsString() {
+		List<File> files = getUserThrustCurveFiles();
+		StringBuilder sb = new StringBuilder();
+		for (File file : files) {
+			if (sb.length() > 0) {
+				sb.append(";");
+			}
+			sb.append(file.getAbsolutePath());
+		}
+		return sb.toString();
 	}
 	
 	public File getDefaultUserThrustCurveFile() {
@@ -319,7 +362,23 @@ public class SwingPreferences extends net.sf.openrocket.startup.Preferences {
 		// TODO: MEDIUM:  Motor fill color (settable?)
 		return new Color(0, 0, 0, 100);
 	}
-	
+
+
+	/**
+	 * Check whether to display the common name (false), or designation (true) in the motor selection table "Name" column
+	 * @return true to display designation, false to display common name
+	 */
+	public boolean getMotorNameColumn() {
+		return getBoolean(net.sf.openrocket.startup.Preferences.MOTOR_NAME_COLUMN, true);
+	}
+
+	/**
+	 * Set whether to display the common name, or designation in the motor selection table "Name" column
+	 * @param value if true, display designation, if false, display common name
+	 */
+	public void setMotorNameColumn(boolean value) {
+		putBoolean(net.sf.openrocket.startup.Preferences.MOTOR_NAME_COLUMN, value);
+	}
 	
 	
 	public static int getMaxThreadCount() {
@@ -388,6 +447,34 @@ public class SwingPreferences extends net.sf.openrocket.startup.Preferences {
 	public void setWindowMaximized(Class<?> c) {
 		PREFNODE.node("windows").put("size." + c.getCanonicalName(), "max");
 		storeVersion();
+	}
+
+	public Integer getTableColumnWidth(String keyName, int columnIdx) {
+		String pref = PREFNODE.node("tables").get(
+				"cw." + keyName + "." + columnIdx, null);
+		if (pref == null)
+			return null;
+
+
+		try {
+			return Integer.parseInt(pref);
+		} catch (NumberFormatException e) {
+			return null;
+		}
+	}
+
+	public Integer getTableColumnWidth(Class<?> c, int columnIdx) {
+		return getTableColumnWidth(c.getCanonicalName(), columnIdx);
+	}
+
+	public void setTableColumnWidth(String keyName, int columnIdx, Integer width) {
+		PREFNODE.node("tables").put(
+				"cw." + keyName + "." + columnIdx, width.toString());
+		storeVersion();
+	}
+
+	public void setTableColumnWidth(Class<?> c, int columnIdx, Integer width) {
+		setTableColumnWidth(c.getCanonicalName(), columnIdx, width);
 	}
 	
 	/**

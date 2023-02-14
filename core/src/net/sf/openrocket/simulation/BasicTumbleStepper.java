@@ -13,8 +13,11 @@ public class BasicTumbleStepper extends AbstractSimulationStepper {
 	private static final double RECOVERY_TIME_STEP = 0.5;
 	
 	@Override
-	public SimulationStatus initialize(SimulationStatus status) {
-		return new BasicTumbleStatus(status);
+	public SimulationStatus initialize(SimulationStatus original) {
+		BasicTumbleStatus status = new BasicTumbleStatus(original);
+		status.setWarnings(original.getWarnings());
+
+		return status;
 	}
 	
 	@Override
@@ -37,8 +40,10 @@ public class BasicTumbleStepper extends AbstractSimulationStepper {
 		double dragForce = tumbleDrag * dynP;
 		
 		// n.b. this is constant, and could be calculated once at the beginning of this simulation branch...
-		double mass = calculateStructureMass(status).getMass();
+		double rocketMass = calculateStructureMass(status).getMass();
+		double motorMass = calculateMotorMass(status).getMass();
 		
+		double mass = rocketMass + motorMass;
 
 		// Compute drag acceleration
 		Coordinate linearAcceleration;
@@ -64,6 +69,27 @@ public class BasicTumbleStepper extends AbstractSimulationStepper {
 		double timeStep = MathUtil.min(0.5 / linearAcceleration.length(), RECOVERY_TIME_STEP);
 		
 		// Perform Euler integration
+		Coordinate newPosition = status.getRocketPosition().add(status.getRocketVelocity().multiply(timeStep)).
+			add(linearAcceleration.multiply(MathUtil.pow2(timeStep) / 2));
+
+		// If I've hit the ground, recalculate time step and position
+		if (newPosition.z < 0) {
+
+			final double a = linearAcceleration.z;
+			final double v = status.getRocketVelocity().z;
+			final double z0 = status.getRocketPosition().z;
+
+			// The new timestep is the solution of
+			// 1/2 at^2 + vt + z0 = 0
+			timeStep = (-v - Math.sqrt(v*v - 2*a*z0))/a;
+			
+			newPosition = status.getRocketPosition().add(status.getRocketVelocity().multiply(timeStep)).
+				add(linearAcceleration.multiply(MathUtil.pow2(timeStep) / 2));
+
+			// avoid rounding error in new altitude
+			newPosition = newPosition.setZ(0);
+		}
+
 		status.setRocketPosition(status.getRocketPosition().add(status.getRocketVelocity().multiply(timeStep)).
 				add(linearAcceleration.multiply(MathUtil.pow2(timeStep) / 2)));
 		status.setRocketVelocity(status.getRocketVelocity().add(linearAcceleration.multiply(timeStep)));
@@ -99,7 +125,7 @@ public class BasicTumbleStepper extends AbstractSimulationStepper {
 			data.setValue(FlightDataType.TYPE_ACCELERATION_TOTAL, linearAcceleration.length());
 			
 			double Re = airSpeed.length() *
-					status.getConfiguration().getLength() /
+					status.getConfiguration().getLengthAerodynamic() /
 					atmosphere.getKinematicViscosity();
 			data.setValue(FlightDataType.TYPE_REYNOLDS_NUMBER, Re);
 		}
@@ -121,7 +147,7 @@ public class BasicTumbleStepper extends AbstractSimulationStepper {
 		data.setValue(FlightDataType.TYPE_MACH_NUMBER, mach);
 		
 		data.setValue(FlightDataType.TYPE_MASS, mass);
-		data.setValue(FlightDataType.TYPE_MOTOR_MASS, 0.0); // Is this a reasonable assumption? Probably.
+		data.setValue(FlightDataType.TYPE_MOTOR_MASS, motorMass);
 		
 		data.setValue(FlightDataType.TYPE_THRUST_FORCE, 0);
 		data.setValue(FlightDataType.TYPE_DRAG_FORCE, dragForce);

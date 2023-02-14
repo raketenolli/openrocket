@@ -1,12 +1,18 @@
 OpenRocket
 ==========
 ![Build Status](https://github.com/openrocket/openrocket/actions/workflows/build.yml/badge.svg)
-[![SourceSpy Dashboard](https://sourcespy.com/shield.svg)](https://sourcespy.com/github/openrocketopenrocket/)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-Overview
+![GitHub release](https://img.shields.io/github/release/openrocket/openrocket.svg)
+[![Github Releases (by release)](https://img.shields.io/github/downloads/openrocket/openrocket/latest/total.svg)](https://GitHub.com/openrocket/openrocket/releases/)
+
 --------
 
 OpenRocket is a free, fully featured model rocket simulator that allows you to design and simulate your rockets before actually building and flying them.
+
+![Three-stage rocket - 2D](.github/OpenRocket_home_2D.png)
+![Three-stage rocket - 3D](.github/OpenRocket_home_3D.png)
+![Three-stage rocket - Simulation plot](.github/OpenRocket_sim.png)
 
 The main features include:
 
@@ -20,15 +26,12 @@ Read more about it on the [OpenRocket Wiki](http://wiki.openrocket.info).
 
 Installers
 ----------
-OpenRocket maintains an installer for installing the software and Java runtime. You can find the installer for Windows at the link below. Installers for macOS and Linux are coming and will be added to this page when ready.
-
-[OpenRocket 15.03 Installer (Windows)](https://github.com/openrocket/openrocket/releases/download/release-15.03/OpenRocket-15.03-installer.exe)
+OpenRocket maintains an installer for installing the software and Java runtime. You can find the installers on [our
+website](https://openrocket.info/downloads.html).
 
 Release Notes
 -------------
-Release notes for all releases of OpenRocket are available at the following link.
-
-[OpenRocket Release Notes](https://github.com/openrocket/openrocket/wiki/Release-Notes)
+Release notes are available on each [release's page](https://github.com/openrocket/openrocket/releases) or on [our website](https://openrocket.info/release_notes.html).
 
 License
 -------
@@ -37,7 +40,7 @@ OpenRocket is an Open Source project licensed under the [GNU GPL](https://www.gn
 
 Contributing
 ------------
-OpenRocket needs help to become even better. Implementing features, writing documentation and creating example designs are just a few ways of helping. If you are interested in helping make OpenRocket the best rocket simulator out there, please [click here for information on how to get involved!](http://openrocket.sourceforge.net/getinvolved.html)
+OpenRocket needs help to become even better. Implementing features, writing documentation and creating example designs are just a few ways of helping. If you are interested in helping make OpenRocket the best rocket simulator out there, please [click here for information on how to get involved](http://openrocket.sourceforge.net/getinvolved.html) and [read the practicalities of contributing here](CONTRIBUTING.md).
 
 **Contributors**
 - Sampo Niskanen, main developer
@@ -47,12 +50,21 @@ OpenRocket needs help to become even better. Implementing features, writing docu
 - Richard Graham, geodetic computations
 - Jason Blood, freeform fin set import
 - Boris du Reau, internationalization
+- Daniel Williams, pod support, maintainer
+- Joe Pfeiffer (maintainer)
+- Billy Olsen (maintainer)
+- Sibo Van Gool (maintainer)
+- Neil Weinstock (tester, icons, forum support)
+- H. Craig Miller (tester)
+
 
 **Translators**
 - Tripoli France
 - Tripoli Spain
 - Stefan Lobas / ERIG
 - Mauro Biasutti
-- Sky Dart Team
+- Sky Dart Team / Ruslan V. Uss
 - Vladimir Beran
 - Polish Rocketry Society / Łukasz & Alex Kazanski
+- Sibo Van Gool
+- Mohamed Amin Elkebsi

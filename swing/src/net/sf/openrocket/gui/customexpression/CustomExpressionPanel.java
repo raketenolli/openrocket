@@ -56,7 +56,7 @@ public class CustomExpressionPanel extends JPanel {
 		//expressionSelectorPanel.add(scroll);
 		
 		//this.add(expressionSelectorPanel, "spany 1, height 10px, wmin 600lp, grow 100, gapright para");
-		this.add(scroll, "hmin 200lp, wmin 700lp, grow 100, wrap");
+		this.add(scroll, "hmin 200lp, wmin 700lp, grow, pushy, wrap");
 		
 		//DescriptionArea desc = new DescriptionArea(trans.get("customExpressionPanel.lbl.UpdateNote")+"\n\n"+trans.get("customExpressionPanel.lbl.CalcNote"), 8, -2f);
 		//desc.setViewportBorder(BorderFactory.createEmptyBorder());
@@ -197,7 +197,7 @@ public class CustomExpressionPanel extends JPanel {
 			//unitSelector = setLabelStyle(unitSelector);
 			//unitSelector.setBackground(Color.WHITE);
 			
-			JButton editButton = new SelectColorButton(Icons.EDIT);
+			JButton editButton = new SelectColorButton(Icons.EDIT_EDIT);
 			editButton.setToolTipText(trans.get("customExpression.Units.but.ttip.Edit"));
 			editButton.setBorderPainted(false);
 			editButton.addActionListener(new ActionListener() {
@@ -234,9 +234,9 @@ public class CustomExpressionPanel extends JPanel {
 			});
 			
 			
-			JButton deleteButton = new SelectColorButton(Icons.DELETE);
+			JButton deleteButton = new SelectColorButton(Icons.EDIT_DELETE);
 			//// Remove this expression
-			deleteButton.setToolTipText(trans.get("customExpression.Units.but.ttip.Remove"));
+			deleteButton.setToolTipText(trans.get("customExpression.Units.but.ttip.Delete"));
 			deleteButton.setBorderPainted(false);
 			deleteButton.addActionListener(new ActionListener() {
 				@Override

@@ -17,10 +17,10 @@ class FlightDataHandler extends AbstractElementHandler {
 	private final DocumentLoadingContext context;
 	
 	private FlightDataBranchHandler dataHandler;
-	private WarningSet warningSet = new WarningSet();
-	private List<FlightDataBranch> branches = new ArrayList<FlightDataBranch>();
+	private final WarningSet warningSet = new WarningSet();
+	private final List<FlightDataBranch> branches = new ArrayList<FlightDataBranch>();
 	
-	private SingleSimulationHandler simHandler;
+	private final SingleSimulationHandler simHandler;
 	private FlightData data;
 	
 	
@@ -91,7 +91,13 @@ class FlightDataHandler extends AbstractElementHandler {
 	@Override
 	public void endHandler(String element, HashMap<String, String> attributes,
 			String content, WarningSet warnings) {
-		
+
+		// If no <databranch> tag in XML, then there is no sim data
+		if (dataHandler == null) {
+			data = null;
+			return;
+		}
+
 		if (branches.size() > 0) {
 			data = new FlightData(branches.toArray(new FlightDataBranch[0]));
 		} else {

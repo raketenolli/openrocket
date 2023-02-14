@@ -71,6 +71,10 @@ public class MassCalculation {
 			this.centerOfMass = this.centerOfMass.average( pointMass);
 		}
 	}
+
+	public void addMass(double mass) {
+		this.centerOfMass = this.centerOfMass.setWeight(getMass() + mass);
+	}
 	
 	public MassCalculation copy( final RocketComponent _root, final Transformation _transform){
 		return new MassCalculation( this.type, this.config, this.simulationTime, this.activeMotorList, _root, _transform, this.analysisMap);
@@ -82,6 +86,10 @@ public class MassCalculation {
 	
 	public double getMass() {
 		return this.centerOfMass.weight;
+	}
+
+	public void setMass(double mass) {
+		this.centerOfMass = this.centerOfMass.setWeight(mass);
 	}
 	
 	public double getLongitudinalInertia() {
@@ -106,7 +114,7 @@ public class MassCalculation {
 	
 	@Override
 	public int hashCode() {
-		return (int) (this.centerOfMass.hashCode());
+		return this.centerOfMass.hashCode();
 	}
 
 	public MassCalculation( final Type _type, final FlightConfiguration _config, final double _time,
@@ -242,7 +250,7 @@ public class MassCalculation {
 		
 		double clusterIt = motorConfig.getUnitLongitudinalInertia()*instanceCount*eachMass;
 		
-		// if more than 1 moter => motors are not an the centerline => adjust via parallel-axis theorem
+		// if more than 1 motor => motors are not at the centerline => adjust via parallel-axis theorem
 		double clusterIr = clusterBaseIr; 
 		if( 1 < instanceCount ){
 			for( Coordinate coord : offsets ){
@@ -343,23 +351,26 @@ public class MassCalculation {
 			
 			// mass data for *this component only* in the rocket-frame
 			compCM = parentTransform.transform( compCM.add(component.getPosition()) );
-			if (component.getOverrideSubcomponents()) {
-				if( component.isMassive() ){
+
+			// setting zero as the CG position means the top of the component, which is component.getPosition()
+			final Coordinate compZero = parentTransform.transform( component.getPosition() );
+
+			if (component.isSubcomponentsOverriddenMass() || component.isSubcomponentsOverriddenCG()) {
+				if (component.isMassive()) {
 					// if this component mass, merge it in before overriding:
 					this.addMass( compCM );
 				}
-				if (component.isMassOverridden()) {
+				if (component.isSubcomponentsOverriddenMass() && component.isMassOverridden()) {
 					this.setCM( this.getCM().setWeight(component.getOverrideMass()) );
 				}
-				if (component.isCGOverridden()) {
-					this.setCM( this.getCM().setX( compCM.x + component.getOverrideCGX()));
+				if (component.isSubcomponentsOverriddenCG() && component.isCGOverridden()) {
+					this.setCM( this.getCM().setX(compZero.x + component.getOverrideCGX()));
 				}
 			}else {
 				if (component.isMassOverridden()) {
 					compCM = compCM.setWeight( component.getOverrideMass() );
 				}
 				if (component.isCGOverridden()) {
-					final Coordinate compZero = parentTransform.transform( Coordinate.ZERO );
 					compCM = compCM.setX( compZero.x + component.getOverrideCGX() );
 				}
 				this.addMass( compCM );
@@ -445,6 +456,7 @@ public class MassCalculation {
 			this.merge( children );
 			//System.err.println(String.format( "%s....assembly mass (incl/children):  %s", prefix, this.toCMDebug()));
 		}
+
 		
 //		// vvv DEBUG
 //		if( this.config.isComponentActive(component) && 0 < this.getMass() ) {

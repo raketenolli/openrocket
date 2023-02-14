@@ -220,7 +220,7 @@ public class SimulationExportPanel extends JPanel {
 	
 	public boolean doExport() {
 		JFileChooser chooser = new JFileChooser();
-		chooser.setFileFilter(FileHelper.CSV_FILE_FILTER);
+		chooser.setFileFilter(FileHelper.CSV_FILTER);
 		chooser.setCurrentDirectory(((SwingPreferences) Application.getPreferences()).getDefaultDirectory());
 		
 		if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION)
@@ -230,7 +230,7 @@ public class SimulationExportPanel extends JPanel {
 		if (file == null)
 			return false;
 		
-		file = FileHelper.ensureExtension(file, "csv");
+		file = FileHelper.forceExtension(file, "csv");
 		if (!FileHelper.confirmWrite(file, this)) {
 			return false;
 		}
@@ -238,6 +238,8 @@ public class SimulationExportPanel extends JPanel {
 		
 		String commentChar = csvOptions.getCommentCharacter();
 		String fieldSep = csvOptions.getFieldSeparator();
+		int decimalPlaces = csvOptions.getDecimalPlaces();
+		boolean isExponentialNotation = csvOptions.isExponentialNotation();
 		boolean simulationComment = csvOptions.getSelectionOption(OPTION_SIMULATION_COMMENTS);
 		boolean fieldComment = csvOptions.getSelectionOption(OPTION_FIELD_DESCRIPTIONS);
 		boolean eventComment = csvOptions.getSelectionOption(OPTION_FLIGHT_EVENTS);
@@ -269,10 +271,10 @@ public class SimulationExportPanel extends JPanel {
 		} else if (fieldSep.equals(TAB)) {
 			fieldSep = "\t";
 		}
-		
-		
-		SaveCSVWorker.export(file, simulation, branch, fieldTypes, fieldUnits, fieldSep,
-				commentChar, simulationComment, fieldComment, eventComment,
+
+
+		SaveCSVWorker.export(file, simulation, branch, fieldTypes, fieldUnits, fieldSep, decimalPlaces,
+				isExponentialNotation, commentChar, simulationComment, fieldComment, eventComment,
 				SwingUtilities.getWindowAncestor(this));
 		
 		return true;

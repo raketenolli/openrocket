@@ -13,6 +13,8 @@ import net.sf.openrocket.util.Quaternion;
 
 public abstract class AbstractSimulationStepper implements SimulationStepper {
 	
+	protected static final double MIN_TIME_STEP = 0.001;
+	
 	/**
 	 * Compute the atmospheric conditions, allowing listeners to override.
 	 * 
@@ -181,7 +183,7 @@ public abstract class AbstractSimulationStepper implements SimulationStepper {
 		
 		thrust = 0;
 		final double currentTime = status.getSimulationTime() + timestep;
-		Collection<MotorClusterState> activeMotorList = status.getMotors();
+		Collection<MotorClusterState> activeMotorList = status.getActiveMotors();
 		for (MotorClusterState currentMotorState : activeMotorList ) {
 			thrust += currentMotorState.getAverageThrust( status.getSimulationTime(), currentTime );
 			//thrust += currentMotorState.getThrust( currentTime );

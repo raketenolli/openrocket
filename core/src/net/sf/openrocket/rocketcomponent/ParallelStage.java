@@ -111,12 +111,18 @@ public class ParallelStage extends AxialStage implements FlightConfigurableCompo
 	}
 	
 	@Override
-	public boolean isLaunchStage(){
-		return true;
+	public boolean isLaunchStage(FlightConfiguration config) {
+		return config.isStageActive(this.stageNumber);
 	}
 
 	@Override 
 	public void setInstanceCount( final int newCount ){
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof ParallelStage) {
+				((ParallelStage) listener).setInstanceCount(newCount);
+			}
+		}
+
 		mutex.verify();
 		if ( newCount < 1) {
 			// there must be at least one instance....   
@@ -175,6 +181,12 @@ public class ParallelStage extends AxialStage implements FlightConfigurableCompo
 	
 	@Override
 	public void setAxialMethod(final AxialMethod _newPosition) {
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof ParallelStage) {
+				((ParallelStage) listener).setAxialMethod(_newPosition);
+			}
+		}
+
 		if (null == this.parent) {
 			throw new NullPointerException(" a Stage requires a parent before any positioning! ");
 		}
@@ -186,29 +198,53 @@ public class ParallelStage extends AxialStage implements FlightConfigurableCompo
 	
 	@Override
 	public void setRadiusOffset(final double radius_m) {
-		setRadius( radiusMethod, radius_m );	
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof ParallelStage) {
+				((ParallelStage) listener).setRadiusOffset(radius_m);
+			}
+		}
+
+		if (radius_m == this.radiusOffset_m) return;
+
+		if (this.radiusMethod.clampToZero() ) {
+			this.radiusOffset_m = 0.0;
+		} else {
+			this.radiusOffset_m = radius_m;
+		}
+		fireComponentChangeEvent(ComponentChangeEvent.BOTH_CHANGE);
 	}
 
 	@Override
 	public void setAngleOffset(final double angle_rad) {
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof ParallelStage) {
+				((ParallelStage) listener).setAngleOffset(angle_rad);
+			}
+		}
+
 		mutex.verify();
 		this.angleOffset_rad = MathUtil.reducePi( angle_rad);
 		fireComponentChangeEvent(ComponentChangeEvent.BOTH_CHANGE);
 	}
 		
 	@Override
-	public void setRadius( final RadiusMethod requestedMethod, final double requestedRadius ) {
+	public void setRadius(RadiusMethod requestedMethod, double requestedRadius ) {
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof ParallelStage) {
+				((ParallelStage) listener).setRadius(requestedMethod, requestedRadius);
+			}
+		}
+
 		mutex.verify();
-		
-		RadiusMethod newMethod = requestedMethod; 
+
 		double newRadius = requestedRadius;
 		
-		if( newMethod.clampToZero() ) {
+		if( requestedMethod.clampToZero() ) {
 			newRadius = 0.;
 		}	
 
-		this.radiusMethod = newMethod;
-		this.radiusOffset_m = newRadius;
+		this.radiusMethod = requestedMethod;
+		this.radiusOffset_m = this.radiusMethod.getAsOffset(getParent(), this, newRadius);
 
 		fireComponentChangeEvent(ComponentChangeEvent.BOTH_CHANGE);
 	}
@@ -220,6 +256,12 @@ public class ParallelStage extends AxialStage implements FlightConfigurableCompo
 
 	@Override
 	public void setAngleMethod(AngleMethod newAngleMethod ) {
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof ParallelStage) {
+				((ParallelStage) listener).setAngleMethod(newAngleMethod);
+			}
+		}
+
 		mutex.verify();
 		this.angleMethod = newAngleMethod;
 		fireComponentChangeEvent(ComponentChangeEvent.BOTH_CHANGE);
@@ -231,8 +273,18 @@ public class ParallelStage extends AxialStage implements FlightConfigurableCompo
 	}
 
 	@Override
-	public void setRadiusMethod(RadiusMethod newRadiusMethod) {
-		setRadius( newRadiusMethod, this.radiusOffset_m );
+	public void setRadiusMethod(RadiusMethod newMethod) {
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof ParallelStage) {
+				((ParallelStage) listener).setRadiusMethod(newMethod);
+			}
+		}
+
+		if (newMethod == this.radiusMethod) return;
+
+		mutex.verify();
+		double radius = this.radiusMethod.getRadius(getParent(), this, this.radiusOffset_m);	// Radius from the parent's center
+		setRadius(newMethod, radius);
 	}
 	
 	

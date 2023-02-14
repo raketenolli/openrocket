@@ -2,11 +2,14 @@ package net.sf.openrocket.gui.dialogs.preset;
 
 
 import java.awt.Dialog;
+import java.awt.Dimension;
 import java.awt.Window;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -25,15 +28,20 @@ import javax.swing.table.TableColumn;
 import javax.swing.table.TableModel;
 
 import net.miginfocom.swing.MigLayout;
+import net.sf.openrocket.gui.adaptors.PresetModel;
+import net.sf.openrocket.gui.components.StyledLabel;
 import net.sf.openrocket.gui.util.GUIUtil;
+import net.sf.openrocket.gui.util.SwingPreferences;
 import net.sf.openrocket.l10n.Translator;
 import net.sf.openrocket.preset.ComponentPreset;
 import net.sf.openrocket.preset.TypedKey;
+import net.sf.openrocket.rocketcomponent.NoseCone;
 import net.sf.openrocket.rocketcomponent.RocketComponent;
 import net.sf.openrocket.rocketcomponent.SymmetricComponent;
 import net.sf.openrocket.startup.Application;
 import net.sf.openrocket.util.Chars;
 import net.sf.openrocket.gui.widgets.SelectColorButton;
+import net.sf.openrocket.utils.TableRowTraversalPolicy;
 
 /**
  * Dialog shown for selecting a preset component.
@@ -43,13 +51,17 @@ public class ComponentPresetChooserDialog extends JDialog {
 	
 	private static final Translator trans = Application.getTranslator();
 	
+	private final SwingPreferences preferences = (SwingPreferences) Application.getPreferences();
+	
 	private final RocketComponent component;
 	
-	private ComponentPresetTable componentSelectionTable;
-	private JTextField filterText;
+	private final ComponentPresetTable componentSelectionTable;
+	private final JTextField filterText;
 	private JCheckBox foreDiameterFilterCheckBox;
 	private JCheckBox aftDiameterFilterCheckBox;
-	
+	private JCheckBox showLegacyCheckBox;
+
+	private ComponentPresetRowFilter legacyFilter;
 	private ComponentPresetRowFilter foreDiameterFilter;
 	private ComponentPresetRowFilter aftDiameterFilter;
 	
@@ -58,21 +70,26 @@ public class ComponentPresetChooserDialog extends JDialog {
 	 * outerDiamtereColumnIndex is the index of the column associated with the OUTER_DIAMETER
 	 * field.  This index is needed by the matchOuterDiameterCheckBox to implement filtering.
 	 */
+	int legacyColumnIndex = -1;	
 	int aftDiameterColumnIndex = -1;
 	int foreDiameterColumnIndex = -1;
 	
 	private List<ComponentPreset> presets;
 	private ComponentPreset.Type presetType;
+	private PresetModel presetModel;
 	
-	private boolean okClicked = false;
 	
-	
-	public ComponentPresetChooserDialog(Window owner, RocketComponent component) {
+	public ComponentPresetChooserDialog(Window owner, RocketComponent component, PresetModel presetModel) {
 		super(owner, trans.get("title"), Dialog.ModalityType.APPLICATION_MODAL);
 		this.component = component;
 		this.presetType = component.getPresetType();
+		this.presetModel = presetModel;
 		this.presets = Application.getComponentPresetDao().listForType(component.getPresetType());
-		
+
+		if (owner.getParent() != null) {
+			this.setPreferredSize(new Dimension((int)(0.7 * owner.getParent().getWidth()), (int) (0.7 * owner.getParent().getHeight())));
+			this.setLocationRelativeTo(owner.getParent());
+		}
 		List<TypedKey<?>> displayedColumnKeys = Arrays.asList(component.getPresetType().getDisplayedColumns());
 		
 		{
@@ -86,6 +103,9 @@ public class ComponentPresetChooserDialog extends JDialog {
 				// this kind of preset.
 				if (!displayedColumnKeys.contains(key)) {
 					continue;
+				}
+				if (key == ComponentPreset.LEGACY) {
+					legacyColumnIndex = i;
 				}
 				if (key == ComponentPreset.OUTER_DIAMETER || key == ComponentPreset.AFT_OUTER_DIAMETER) {
 					aftDiameterColumnIndex = i;
@@ -107,7 +127,7 @@ public class ComponentPresetChooserDialog extends JDialog {
 		sub.add(filterLabel, "gapright para");
 		
 		filterText = new JTextField();
-		sub.add(filterText, "width 50:320, growx");
+		sub.add(filterText, "width 50:320, pushx, growx");
 		filterText.getDocument().addDocumentListener(new DocumentListener() {
 			@Override
 			public void changedUpdate(DocumentEvent e) {
@@ -125,92 +145,130 @@ public class ComponentPresetChooserDialog extends JDialog {
 			}
 		});
 		
-		panel.add(sub, "growx, ay 0, gapright para");
-		
-		
-		panel.add(getFilterCheckboxes(), "wrap para");
-		
+		panel.add(sub, "growx, pushx, ay 0, gapright para");
+
+		// need to create componentSelectionTable before filter checkboxes,
+		// but add to panel after
 		componentSelectionTable = new ComponentPresetTable(presetType, presets, displayedColumnKeys);
-		//		GUIUtil.setAutomaticColumnTableWidths(componentSelectionTable, 20);
+		GUIUtil.setAutomaticColumnTableWidths(componentSelectionTable, 20);
 		int w = componentSelectionTable.getRowHeight() + 4;
-		TableColumn tc = componentSelectionTable.getColumnModel().getColumn(0);
+		XTableColumnModel tm = componentSelectionTable.getXColumnModel();
+		//TableColumn tc = componentSelectionTable.getColumnModel().getColumn(0);
+		TableColumn tc = tm.getColumn(0);
 		tc.setPreferredWidth(w);
 		tc.setMaxWidth(w);
 		tc.setMinWidth(w);
+
+		// The normal left/right and tab/shift-tab key action traverses each cell/column of the table instead of going to the next row.
+		TableRowTraversalPolicy.setTableRowTraversalPolicy(componentSelectionTable);
+
+		panel.add(getFilterCheckboxes(tm, legacyColumnIndex), "wrap para");
 		
 		JScrollPane scrollpane = new JScrollPane();
 		scrollpane.setViewportView(componentSelectionTable);
-		panel.add(scrollpane, "grow, width 700lp, height 300lp, spanx, wrap rel");
+		panel.add(scrollpane, "grow, pushy, spanx, wrap rel");
 		
-		panel.add(new JLabel(Chars.UP_ARROW + " " + trans.get("lbl.favorites")), "spanx, gapleft 5px, wrap para");
-		
-		
-		// OK / Cancel buttons
-		JButton okButton = new SelectColorButton(trans.get("dlg.but.ok"));
-		okButton.addActionListener(new ActionListener() {
+		panel.add(new StyledLabel(String.format("<html>%s %s</html>", Chars.UP_ARROW, trans.get("lbl.favorites")), -1), "spanx, gapleft 5px, wrap para");
+
+		// When double-clicking a preset row, apply the preset and close this dialog
+		componentSelectionTable.addMouseListener(new MouseAdapter() {
 			@Override
-			public void actionPerformed(ActionEvent e) {
-				close(true);
+			public void mouseClicked(MouseEvent e) {
+				// Don't do anything when double-clicking the first column
+				if (e.getClickCount() == 2 && componentSelectionTable.getSelectedColumn() > 0 && applySelectedPreset()) {
+					ComponentPresetChooserDialog.this.setVisible(false);
+				}
 			}
 		});
-		panel.add(okButton, "tag ok, spanx, split");
-		
-		//// Cancel button
-		JButton cancelButton = new SelectColorButton(trans.get("dlg.but.cancel"));
-		cancelButton.addActionListener(new ActionListener() {
+
+		// Always open this window when creating a new component
+		JCheckBox alwaysOpenPreset = new JCheckBox(String.format(trans.get("ComponentPresetChooserDialog.checkbox.alwaysOpenPreset"),
+				component.getComponentName()));
+		alwaysOpenPreset.setSelected(preferences.getBoolean(component.getComponentName() +  "AlwaysOpenPreset", true));
+		alwaysOpenPreset.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				close(false);
+				preferences.putBoolean(component.getComponentName() + "AlwaysOpenPreset", ((JCheckBox) e.getSource()).isSelected());
 			}
 		});
-		panel.add(cancelButton, "tag cancel");
+		panel.add(alwaysOpenPreset, "spanx 2");
+		
+		// Close buttons
+		JButton closeButton = new SelectColorButton(trans.get("dlg.but.close"));
+		closeButton.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				ComponentPresetChooserDialog.this.setVisible(false);
+				applySelectedPreset();
+			}
+		});
+		panel.add(closeButton, "spanx, right, tag close");
 		
 		this.add(panel);
-		
+
+		GUIUtil.setDisposableDialogOptions(this, closeButton);
 		GUIUtil.rememberWindowSize(this);
-		GUIUtil.setDisposableDialogOptions(this, okButton);
+		this.setLocationByPlatform(true);
+		GUIUtil.rememberWindowPosition(this);
+		GUIUtil.rememberTableColumnWidths(componentSelectionTable, "Presets" + component.getClass().getCanonicalName());
+
+		updateFilters();
+	}
+
+	/**
+	 * Applies the currently selected preset to presetModel.
+	 *
+	 * @return true if the preset was applied, false if otherwise.
+	 */
+	private boolean applySelectedPreset() {
+		if (presetModel == null) return false;
+		ComponentPreset preset = getSelectedComponentPreset();
+		if (preset != null) {
+			presetModel.setSelectedItem(preset);
+			return true;
+		}
+		return false;
 	}
 	
 	
-	private JPanel getFilterCheckboxes() {
+	private JPanel getFilterCheckboxes(XTableColumnModel tm, int legacyColumnIndex) {
 		JPanel panel = new JPanel(new MigLayout("ins 0"));
-		
+
 		/*
-		 * Add show all compatible check box.
+		 * Add legacy component filter checkbox
 		 */
-		final List<ComponentPreset.Type> compatibleTypes = component.getPresetType().getCompatibleTypes();
-		final ComponentPreset.Type nativeType = component.getPresetType();
-		if (compatibleTypes != null && compatibleTypes.size() > 0) {
-			JCheckBox showAll = new JCheckBox();
-			showAll.setText(trans.get("ComponentPresetChooserDialog.checkbox.showAllCompatible"));
-			panel.add(showAll, "wrap");
-			showAll.addItemListener(new ItemListener() {
+		TableColumn legacyColumn = tm.getColumn(legacyColumnIndex);
+		tm.setColumnVisible(legacyColumn, false);		
+		legacyFilter = new ComponentPresetRowFilter(false, legacyColumnIndex);
+		showLegacyCheckBox = new JCheckBox();
+		showLegacyCheckBox.setText(trans.get("ComponentPresetChooserDialog.checkbox.showLegacyCheckBox"));
+		panel.add(showLegacyCheckBox, "wrap");
+		
+		showLegacyCheckBox.addItemListener(new ItemListener() {
 				@Override
 				public void itemStateChanged(ItemEvent e) {
-					if (((JCheckBox) e.getItem()).isSelected()) {
-						presets = Application.getComponentPresetDao().listForTypes(compatibleTypes);
-					} else {
-						presets = Application.getComponentPresetDao().listForType(nativeType);
-					}
-					componentSelectionTable.updateData(presets);
+					updateFilters();
+					tm.setColumnVisible(legacyColumn, showLegacyCheckBox.isSelected());
 				}
-			});
-		}
-
+			});			
+		
 		if(component instanceof SymmetricComponent) {
 			final SymmetricComponent curSym = (SymmetricComponent) component;
 			/*
 			 * Add filter by fore diameter
 			 */
 			foreDiameterFilterCheckBox = new JCheckBox(trans.get("ComponentPresetChooserDialog.checkbox.filterForeDiameter"));
+			foreDiameterFilterCheckBox.setToolTipText(trans.get("ComponentPresetChooserDialog.checkbox.filterForeDiameter.ttip"));
 			final SymmetricComponent prevSym = curSym.getPreviousSymmetricComponent();
 			if (prevSym != null && foreDiameterColumnIndex >= 0) {
+				foreDiameterFilterCheckBox.setSelected(preferences.isMatchForeDiameter());
 				foreDiameterFilter = new ComponentPresetRowFilter(prevSym.getAftRadius() * 2.0, foreDiameterColumnIndex);
 				panel.add(foreDiameterFilterCheckBox, "wrap");
 				foreDiameterFilterCheckBox.addItemListener(new ItemListener() {
 					@Override
 					public void itemStateChanged(ItemEvent e) {
 						updateFilters();
+						preferences.setMatchForeDiameter(foreDiameterFilterCheckBox.isSelected());
 					}
 				});
 			}
@@ -218,15 +276,25 @@ public class ComponentPresetChooserDialog extends JDialog {
 			/*
 			 * Add filter by aft diameter
 			 */
-			aftDiameterFilterCheckBox = new JCheckBox(trans.get("ComponentPresetChooserDialog.checkbox.filterAftDiameter"));
-			final SymmetricComponent nextSym = curSym.getNextSymmetricComponent();
+			final SymmetricComponent nextSym;
+			if (curSym instanceof NoseCone && ((NoseCone) curSym).isFlipped()) {
+				aftDiameterFilterCheckBox = new JCheckBox(trans.get("ComponentPresetChooserDialog.checkbox.filterForeDiameter"));
+				aftDiameterFilterCheckBox.setToolTipText(trans.get("ComponentPresetChooserDialog.checkbox.filterForeDiameter.ttip"));
+				nextSym = curSym.getPreviousSymmetricComponent();
+			} else {
+				aftDiameterFilterCheckBox = new JCheckBox(trans.get("ComponentPresetChooserDialog.checkbox.filterAftDiameter"));
+				aftDiameterFilterCheckBox.setToolTipText(trans.get("ComponentPresetChooserDialog.checkbox.filterAftDiameter.ttip"));
+				nextSym = curSym.getNextSymmetricComponent();
+			}
 			if (nextSym != null && aftDiameterColumnIndex >= 0) {
+				aftDiameterFilterCheckBox.setSelected(preferences.isMatchAftDiameter());
 				aftDiameterFilter = new ComponentPresetRowFilter(nextSym.getForeRadius() * 2.0, aftDiameterColumnIndex);
 				panel.add(aftDiameterFilterCheckBox, "wrap");
 				aftDiameterFilterCheckBox.addItemListener(new ItemListener() {
 					@Override
 					public void itemStateChanged(ItemEvent e) {
 						updateFilters();
+						preferences.setMatchAftDiameter(aftDiameterFilterCheckBox.isSelected());
 					}
 				});
 			}
@@ -241,8 +309,6 @@ public class ComponentPresetChooserDialog extends JDialog {
 	 * @return	the selected motor, or <code>null</code> if no motor has been selected or the selection was canceled.
 	 */
 	public ComponentPreset getSelectedComponentPreset() {
-		if (!okClicked)
-			return null;
 		int row = componentSelectionTable.getSelectedRow();
 		if (row < 0) {
 			// Nothing selected.
@@ -250,11 +316,6 @@ public class ComponentPresetChooserDialog extends JDialog {
 		}
 		row = componentSelectionTable.convertRowIndexToModel(row);
 		return presets.get(row);
-	}
-	
-	public void close(boolean ok) {
-		okClicked = ok;
-		this.setVisible(false);
 	}
 	
 	private void updateFilters() {
@@ -268,11 +329,14 @@ public class ComponentPresetChooserDialog extends JDialog {
 			} catch (java.util.regex.PatternSyntaxException e) {
 			}
 		}
-		if (aftDiameterFilterCheckBox.isSelected()) {
+		if ((null != aftDiameterFilterCheckBox) && aftDiameterFilterCheckBox.isSelected()) {
 			filters.add(aftDiameterFilter);
 		}
-		if (foreDiameterFilterCheckBox.isSelected()) {
+		if ((null != foreDiameterFilterCheckBox) && foreDiameterFilterCheckBox.isSelected()) {
 			filters.add(foreDiameterFilter);
+		}
+		if (!showLegacyCheckBox.isSelected()) {
+			filters.add(legacyFilter);
 		}
 		
 		componentSelectionTable.setRowFilter(RowFilter.andFilter(filters));

@@ -67,6 +67,9 @@ public interface AerodynamicCalculator extends Monitorable {
 	 * @return	a new, independent instance of this aerodynamic calculator type
 	 */
 	public AerodynamicCalculator newInstance();
-		
-	public boolean isContinuous( final Rocket rkt);
+
+	/**
+	 * Check component assembly for geometric problems and post any needed warnings
+	 */
+	public void checkGeometry(FlightConfiguration configuration, final RocketComponent component, WarningSet warnings);
 }

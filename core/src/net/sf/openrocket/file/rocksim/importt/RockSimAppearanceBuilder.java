@@ -9,7 +9,7 @@ import net.sf.openrocket.appearance.AppearanceBuilder;
 import net.sf.openrocket.appearance.Decal.EdgeMode;
 import net.sf.openrocket.document.Attachment;
 import net.sf.openrocket.file.DocumentLoadingContext;
-import net.sf.openrocket.file.rocksim.RocksimCommonConstants;
+import net.sf.openrocket.file.rocksim.RockSimCommonConstants;
 import net.sf.openrocket.util.Color;
 
 public class RockSimAppearanceBuilder extends AppearanceBuilder {
@@ -25,7 +25,7 @@ public class RockSimAppearanceBuilder extends AppearanceBuilder {
 	
 	public void processElement(String element, String content, WarningSet warnings) {
 		try {
-			if (RocksimCommonConstants.TEXTURE.equals(element)) {
+			if (RockSimCommonConstants.TEXTURE.equals(element)) {
 				parseTexture(content);
 			} else if ("Ambient".equals(element)) {
 				//ignored
@@ -121,8 +121,7 @@ public class RockSimAppearanceBuilder extends AppearanceBuilder {
 		//TODO Make use of these values
 		//System.out.println("Interpolate: " + interpolate);
 		//System.out.println("FlipT: " + flipt);
-		;
-		
+
 	}
 	
 	static Color weight(Color c, double w) {
@@ -149,7 +148,7 @@ public class RockSimAppearanceBuilder extends AppearanceBuilder {
 		}
 		s = s.replace("rgb(", "");
 		s = s.replace(")", "");
-		String ss[] = s.split(",");
+		String[] ss = s.split(",");
 		return new Color(Integer.parseInt(ss[0]), Integer.parseInt(ss[1]), Integer.parseInt(ss[2]));
 	}
 	

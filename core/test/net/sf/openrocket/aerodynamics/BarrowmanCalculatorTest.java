@@ -19,6 +19,7 @@ import net.sf.openrocket.rocketcomponent.FinSet;
 import net.sf.openrocket.rocketcomponent.FlightConfiguration;
 import net.sf.openrocket.rocketcomponent.NoseCone;
 import net.sf.openrocket.rocketcomponent.ParallelStage;
+import net.sf.openrocket.rocketcomponent.PodSet;
 import net.sf.openrocket.rocketcomponent.Rocket;
 import net.sf.openrocket.rocketcomponent.Transition;
 import net.sf.openrocket.rocketcomponent.TrapezoidFinSet;
@@ -45,6 +46,26 @@ public class BarrowmanCalculatorTest {
 //			Injector injector = Guice.createInjector(guiModule, pluginModule);
 //			Application.setInjector(injector);
 //		}
+	}
+
+	/**
+	 * Test a completely empty rocket.
+	 */
+	@Test
+	public void testEmptyRocket() {
+		// First test completely empty rocket
+		Rocket rocket = new Rocket();
+		FlightConfiguration config = rocket.getSelectedConfiguration();
+		BarrowmanCalculator calc = new BarrowmanCalculator();
+		FlightConditions conditions = new FlightConditions(config);
+		WarningSet warnings = new WarningSet();
+
+		Coordinate cp_calc = calc.getCP(config, conditions, warnings);
+
+		assertEquals(" Empty rocket CNa value is incorrect:", 0.0, cp_calc.weight , 0.0);
+		assertEquals(" Empty rocket cp x value is incorrect:", 0.0, cp_calc.x , 0.0);
+		assertEquals(" Empty rocket cp y value is incorrect:", 0.0, cp_calc.y , 0.0);
+		assertEquals(" Empty rocket cp z value is incorrect:", 0.0, cp_calc.z , 0.0);
 	}
 	
 	@Test
@@ -267,22 +288,30 @@ public class BarrowmanCalculatorTest {
 	public void testContinuousRocket() {
 		Rocket rocket = TestRockets.makeEstesAlphaIII();
 		AerodynamicCalculator calc = new BarrowmanCalculator();
+		FlightConfiguration configuration = rocket.getSelectedConfiguration();
+		WarningSet warnings = new WarningSet();
 		
-		assertTrue("Estes Alpha III should be continous: ", calc.isContinuous( rocket));
+		calc.checkGeometry(configuration, rocket, warnings);
+		assertTrue("Estes Alpha III should be continuous: ", warnings.isEmpty());		
 	}
 	
 	@Test
 	public void testContinuousRocketWithStrapOns() {
 		Rocket rocket = TestRockets.makeFalcon9Heavy();
 		AerodynamicCalculator calc = new BarrowmanCalculator();
+		FlightConfiguration configuration = rocket.getSelectedConfiguration();
+		WarningSet warnings = new WarningSet();
 		
-		assertTrue("F9H should be continuous: ", calc.isContinuous( rocket));
+		calc.checkGeometry(configuration, rocket, warnings);
+		assertTrue("F9H should be continuous: ", warnings.isEmpty());		
 	}
 	
 	@Test
 	public void testRadialDiscontinuousRocket() {
 		Rocket rocket = TestRockets.makeEstesAlphaIII();
 		AerodynamicCalculator calc = new BarrowmanCalculator();
+		FlightConfiguration configuration = rocket.getSelectedConfiguration();
+		WarningSet warnings = new WarningSet();
 		
 		NoseCone nose = (NoseCone)rocket.getChild(0).getChild(0);
 		BodyTube body = (BodyTube)rocket.getChild(0).getChild(1);
@@ -290,14 +319,17 @@ public class BarrowmanCalculatorTest {
 		nose.setAftRadius(0.015);
 		body.setOuterRadius( 0.012 );
 		body.setName( body.getName()+"  << discontinuous");
-		
-		assertFalse(" Estes Alpha III has an undetected discontinuity:", calc.isContinuous( rocket));
+
+		calc.checkGeometry(configuration, rocket, warnings);
+		assertFalse(" Estes Alpha III has an undetected discontinuity:", warnings.isEmpty());		
 	}
 	
 	@Test
 	public void testRadialDiscontinuityWithStrapOns() {
 		Rocket rocket = TestRockets.makeFalcon9Heavy();
 		AerodynamicCalculator calc = new BarrowmanCalculator();
+		FlightConfiguration configuration = rocket.getSelectedConfiguration();
+		WarningSet warnings = new WarningSet();
 		
 		final AxialStage coreStage = (AxialStage)rocket.getChild(1);
 		final ParallelStage booster = (ParallelStage)coreStage.getChild(0).getChild(0);
@@ -309,7 +341,8 @@ public class BarrowmanCalculatorTest {
 		body.setOuterRadius( 0.012 );
 		body.setName( body.getName()+"  << discontinuous");
 		
-		assertFalse(" Missed discontinuity in Falcon 9 Heavy:", calc.isContinuous( rocket));
+		calc.checkGeometry(configuration, rocket, warnings);
+		assertFalse(" Missed discontinuity in Falcon 9 Heavy:" , warnings.isEmpty());		
 	}
 
 	@Test
@@ -347,4 +380,116 @@ public class BarrowmanCalculatorTest {
 		assertEquals(" Alpha III With Pods rocket cp z value is incorrect:", cpNoPods.z, cpPods.z, EPSILON);
 		assertEquals(" Alpha III With Pods rocket CNa value is incorrect:", cpPods.weight, cpNoPods.weight - 3.91572, EPSILON);
 	}
+
+	/**
+	 * Tests whether adding extra empty stages has an effect.
+	 */
+	@Test
+	public void testEmptyStages() {
+		// Reference rocket
+		Rocket rocketRef = TestRockets.makeEstesAlphaIII();
+		FlightConfiguration configRef = rocketRef.getSelectedConfiguration();
+		BarrowmanCalculator calcRef = new BarrowmanCalculator();
+		FlightConditions conditionsRef = new FlightConditions(configRef);
+		WarningSet warnings = new WarningSet();
+
+		Coordinate cp_calcRef = calcRef.getCP(configRef, conditionsRef, warnings);
+
+		// First test with adding an empty stage in the front of the design
+		Rocket rocketFront = TestRockets.makeEstesAlphaIII();
+		AxialStage stage1 = new AxialStage();		// To be placed in front of the design
+		rocketFront.addChild(stage1, 0);
+		FlightConfiguration configFront = rocketFront.getSelectedConfiguration();
+		BarrowmanCalculator calcFront = new BarrowmanCalculator();
+		FlightConditions conditionsFront = new FlightConditions(configFront);
+		warnings = new WarningSet();
+
+		Coordinate cp_calcFront = calcFront.getCP(configFront, conditionsFront, warnings);
+
+		assertEquals(" Estes Alpha III with front empty stage CNa value is incorrect:", cp_calcRef.weight, cp_calcFront.weight , EPSILON);
+		assertEquals(" Estes Alpha III with front empty stage cp x value is incorrect:", cp_calcRef.x, cp_calcFront.x , EPSILON);
+		assertEquals(" Estes Alpha III with front empty stage cp y value is incorrect:", cp_calcRef.y, cp_calcFront.y , EPSILON);
+		assertEquals(" Estes Alpha III with front empty stage cp z value is incorrect:", cp_calcRef.z, cp_calcFront.z , EPSILON);
+
+		// Now test with adding an empty stage in the rear of the design
+		Rocket rocketRear = TestRockets.makeEstesAlphaIII();
+		AxialStage stage2 = new AxialStage();		// To be placed in the rear of the design
+		rocketRear.addChild(stage2);
+		FlightConfiguration configRear = rocketRear.getSelectedConfiguration();
+		BarrowmanCalculator calcRear = new BarrowmanCalculator();
+		FlightConditions conditionsRear = new FlightConditions(configRear);
+		warnings = new WarningSet();
+
+		Coordinate cp_calcRear = calcRear.getCP(configRear, conditionsRear, warnings);
+
+		assertEquals(" Estes Alpha III with rear empty stage CNa value is incorrect:", cp_calcRef.weight, cp_calcRear.weight , EPSILON);
+		assertEquals(" Estes Alpha III with rear empty stage cp x value is incorrect:", cp_calcRef.x, cp_calcRear.x , EPSILON);
+		assertEquals(" Estes Alpha III with rear empty stage cp y value is incorrect:", cp_calcRef.y, cp_calcRear.y , EPSILON);
+		assertEquals(" Estes Alpha III with rear empty stage cp z value is incorrect:", cp_calcRef.z, cp_calcRear.z , EPSILON);
+
+		// Test with multiple empty stages
+		Rocket rocketMulti = rocketFront;
+		AxialStage stage3 = new AxialStage();		// To be placed in the rear of the design
+		rocketMulti.addChild(stage3);
+		FlightConfiguration configMulti = rocketMulti.getSelectedConfiguration();
+		BarrowmanCalculator calcMulti = new BarrowmanCalculator();
+		FlightConditions conditionsMulti = new FlightConditions(configMulti);
+		warnings = new WarningSet();
+
+		Coordinate cp_calcMulti = calcMulti.getCP(configMulti, conditionsMulti, warnings);
+
+		assertEquals(" Estes Alpha III with multiple empty stages CNa value is incorrect:", cp_calcRef.weight, cp_calcMulti.weight , EPSILON);
+		assertEquals(" Estes Alpha III with multiple empty stages cp x value is incorrect:", cp_calcRef.x, cp_calcMulti.x , EPSILON);
+		assertEquals(" Estes Alpha III with multiple empty stages cp y value is incorrect:", cp_calcRef.y, cp_calcMulti.y , EPSILON);
+		assertEquals(" Estes Alpha III with multiple empty stages cp z value is incorrect:", cp_calcRef.z, cp_calcMulti.z , EPSILON);
+	}
+
+	/**
+	 * Tests in-line pod aerodynamics and warnings
+	 *
+	 */
+	@Test
+	public void testInlinePods() {
+		WarningSet warnings = new WarningSet();
+		
+		// reference rocket and results
+		final Rocket refRocket = TestRockets.makeEstesAlphaIII();
+		final FlightConfiguration refConfig = refRocket.getSelectedConfiguration();
+		final FlightConditions refConditions = new FlightConditions(refConfig);
+		
+		final BarrowmanCalculator refCalc = new BarrowmanCalculator();
+		double refCP = refCalc.getCP(refConfig, refConditions, warnings).x;
+		final AerodynamicForces refForces = refCalc.getAerodynamicForces(refConfig, refConditions, warnings);		
+		assertTrue("reference rocket should have no warnings", warnings.isEmpty());
+		final double refCD = refForces.getCD();
+
+		// test rocket
+		final Rocket testRocket = TestRockets.makeEstesAlphaIIIwithInlinePod();
+		final PodSet pod = (PodSet) testRocket.getChild(0).getChild(1).getChild(0);
+		final FlightConfiguration testConfig = testRocket.getSelectedConfiguration();
+		final FlightConditions testConditions = new FlightConditions(testConfig);
+		
+		TestRockets.dumpRocket(testRocket, "/home/joseph/rockets/openrocket/git/openrocket/work/testrocket.ork");
+		final BarrowmanCalculator testCalc = new BarrowmanCalculator();
+		double testCP = testCalc.getCP(testConfig, testConditions, warnings).x;
+		final AerodynamicForces testForces = testCalc.getAerodynamicForces(testConfig, testConditions, warnings);
+		assertTrue("test rocket should have no warnings", warnings.isEmpty());
+
+		assertEquals("ref and test rocket CP should match", refCP, testCP, EPSILON);
+
+		final double testCD = testForces.getCD();
+		assertEquals("ref and test rocket CD should match", refCD, testCD, EPSILON);
+
+		// move the pod back.
+		pod.setAxialOffset(pod.getAxialOffset() + 0.1);
+		testCP = testCalc.getCP(testConfig, testConditions, warnings).x;
+		assertFalse("should be warning from gap in airframe", warnings.isEmpty());
+
+		// move the pod forward.
+		warnings.clear();
+		pod.setAxialOffset(pod.getAxialOffset() - 0.2);
+		testCP = testCalc.getCP(testConfig, testConditions, warnings).x;		
+		assertFalse("should be warning from airframe overlap", warnings.isEmpty());
+	}
+		
 }

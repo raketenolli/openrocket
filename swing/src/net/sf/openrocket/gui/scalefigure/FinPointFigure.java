@@ -54,7 +54,9 @@ public class FinPointFigure extends AbstractScaleFigure {
 	private int modID = -1;
 
 	protected BoundingBox finBounds_m = null;
-	protected BoundingBox mountBounds_m = null;
+	// Fin parent bounds
+	protected BoundingBox mountBoundsMax_m = null;		// Bounds using the maximum parent radius
+	protected BoundingBox mountBoundsMin_m = null;		// Bound using the minimum parent radius
 
 	protected final List<StateChangeListener> listeners = new LinkedList<>();
 
@@ -161,7 +163,7 @@ public class FinPointFigure extends AbstractScaleFigure {
 		}
 	}
 
-	// NOTE:  This function drawns relative to the reference point of the BODY component
+	// NOTE:  This function draws relative to the reference point of the BODY component
 	// In other words: 0,0 == the front, foreRadius of the body component
 	private void paintBodyTransition( Graphics2D g2){
 
@@ -178,14 +180,15 @@ public class FinPointFigure extends AbstractScaleFigure {
 		// vv in fin-frame == draw-frame vv
 		final double xOffset = -xFinStart;
 		final double yOffset = -body.getRadius(xFinStart);
+		final float length_m = (float)( body.getLength());
 
 		Path2D.Double bodyShape = new Path2D.Double();
 		// draw front-cap:
 		bodyShape.moveTo( xOffset, yOffset);
 		bodyShape.lineTo( xOffset, yOffset + body.getForeRadius());
 
-		final float length_m = (float)( body.getLength());
-		Point2D.Double cur = new Point2D.Double ();
+		// draw edge
+		Point2D.Double cur = new Point2D.Double();
 		for( double xBody = xResolution_m ; xBody < length_m;  xBody += xResolution_m ){
 			// xBody is distance from front of parent body
 			cur.x = xOffset + xBody; // offset from origin (front of fin)
@@ -203,11 +206,11 @@ public class FinPointFigure extends AbstractScaleFigure {
 
 	private void paintBodyTube( Graphics2D g2){
 		// in-figure left extent
-		final double xFore = mountBounds_m.min.x;
+		final double xFore = mountBoundsMax_m.min.x;
 		// in-figure right extent
-		final double xAft = mountBounds_m.max.x;
+		final double xAft = mountBoundsMax_m.max.x;
 		// in-figure right extent
-		final double yCenter = mountBounds_m.min.y;
+		final double yCenter = mountBoundsMax_m.min.y;
 
 		Path2D.Double shape = new Path2D.Double();
 		shape.moveTo( xFore, yCenter );
@@ -223,7 +226,7 @@ public class FinPointFigure extends AbstractScaleFigure {
 
 	private void paintFinShape(final Graphics2D g2){
 		// excludes fin tab points
-		final Coordinate[] drawPoints = finset.getFinPoints();
+		final Coordinate[] drawPoints = finset.getFinPointsWithRoot();
 
 		Path2D.Double shape = new Path2D.Double();
 		Coordinate startPoint= drawPoints[0];
@@ -372,33 +375,37 @@ public class FinPointFigure extends AbstractScaleFigure {
 		final double xFinFront = finset.getAxialOffset(AxialMethod.TOP);
 		final double xParent = -xFinFront;
 		final double yParent = -parent.getRadius(xParent); // from fin-front to parent centerline
-		final double rParent = Math.max(parent.getForeRadius(), parent.getAftRadius());
+		final double rParentMax = Math.max(parent.getForeRadius(), parent.getAftRadius());
+		final double rParentMin = Math.min(parent.getForeRadius(), parent.getAftRadius());
 
-		mountBounds_m = new BoundingBox()
+		mountBoundsMax_m = new BoundingBox()
 				.update(new Coordinate(xParent, yParent, 0))
-				.update(new Coordinate(xParent + parent.getLength(), yParent + rParent));
+				.update(new Coordinate(xParent + parent.getLength(), yParent + rParentMax));
+		mountBoundsMin_m = new BoundingBox()
+				.update(new Coordinate(xParent, yParent, 0))
+				.update(new Coordinate(xParent + parent.getLength(), yParent + rParentMin));
 
-		final BoundingBox combinedBounds = new BoundingBox().update(finBounds_m).update(mountBounds_m);
+		final BoundingBox combinedBounds = new BoundingBox().update(finBounds_m).update(mountBoundsMax_m);
 
 		contentBounds_m = combinedBounds.toRectangle();
 	}
 
 	@Override
 	protected void updateCanvasOrigin() {
-		final int finHeightPx = (int)(finBounds_m.max.y*scale);
-		final int mountHeightPx = (int)(mountBounds_m.span().y*scale);
+		final int finBottomPy = (int)(finBounds_m.max.y*scale);
+		final int mountHeight = (int)(mountBoundsMin_m.span().y*scale);
 		// this is non-intuitive: it's an offset _from_ the origin(0,0) _to_ the lower-left of the content --
 		// because the canvas is drawn from that lower-left corner of the content, and the fin-front
 		// is fixed-- by definition-- to the origin.
 		final int finFrontPx = -(int)(contentBounds_m.getX()*scale);  // pixels from left-border to fin-front
-		final int contentHeightPx = (int)(contentBounds_m.getHeight()*scale);
+		final int contentHeight = (int)(contentBounds_m.getHeight()*scale);
 
 		originLocation_px.x = borderThickness_px.width + finFrontPx;
 
-		if( visibleBounds_px.height > (contentHeightPx + 2*borderThickness_px.height)){
-			originLocation_px.y = getHeight() - mountHeightPx - borderThickness_px.height;
+		if( visibleBounds_px.height > (contentHeight + 2*borderThickness_px.height)){
+			originLocation_px.y = getHeight() - mountHeight - borderThickness_px.height;
 		}else {
-			originLocation_px.y = borderThickness_px.height + finHeightPx;
+			originLocation_px.y = borderThickness_px.height + finBottomPy;
 		}
 	}
 

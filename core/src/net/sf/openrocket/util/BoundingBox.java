@@ -5,8 +5,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 
 public class BoundingBox {
-	public Coordinate min;
-	public Coordinate max;
+	public Coordinate min;		// Top-left coordinate of the bounding box
+	public Coordinate max;		// Bottom-right coordinate of the bounding box
 
 	public BoundingBox() {
 	    clear();
@@ -29,13 +29,9 @@ public class BoundingBox {
 	}
 
 	public boolean isEmpty(){
-		if( (min.x > max.x) ||
-			(min.y > max.y) ||
-			(min.z > max.z)){
-			return true;
-		}else{
-			return false;
-		}
+        return (min.x > max.x) ||
+                (min.y > max.y) ||
+                (min.z > max.z);
 	}
 
 	/**
@@ -162,11 +158,18 @@ public class BoundingBox {
 	public Rectangle2D toRectangle() {
 		return new Rectangle2D.Double(min.x, min.y, (max.x-min.x), (max.y - min.y));
     }
-	
+
 	@Override
 	public String toString() {
 		return String.format("[( %g, %g, %g) < ( %g, %g, %g)]",
 				min.x, min.y, min.z,
 				max.x, max.y, max.z );
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return other instanceof BoundingBox &&
+				((BoundingBox) other).min.equals(this.min) &&
+				((BoundingBox) other).max.equals(this.max);
 	}
 }

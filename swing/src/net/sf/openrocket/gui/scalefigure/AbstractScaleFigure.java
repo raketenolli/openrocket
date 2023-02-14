@@ -27,9 +27,6 @@ public abstract class AbstractScaleFigure extends JPanel {
     public static final double INCHES_PER_METER = 39.3701;
     public static final double METERS_PER_INCH = 0.0254;
     
-    public static final double MINIMUM_ZOOM =    0.01; // ==      1 %
-    public static final double MAXIMUM_ZOOM = 1000.00; // == 10,000 %
-    
 	// Number of pixels to leave at edges when fitting figure
 	private static final int DEFAULT_BORDER_PIXELS_WIDTH = 30;
 	private static final int DEFAULT_BORDER_PIXELS_HEIGHT = 20;
@@ -40,7 +37,7 @@ public abstract class AbstractScaleFigure extends JPanel {
 	protected double userScale = 1.0;
 	protected double scale = -1;
 
-	// pixel offset from the the subject's origin to the canvas's upper-left-corner.
+	// pixel offset from the subject's origin to the canvas's upper-left-corner.
 	protected Point originLocation_px = new Point(0,0);
 	
 	// size of the visible region
@@ -110,17 +107,20 @@ public abstract class AbstractScaleFigure extends JPanel {
 	 *
 	 * @param newScaleRequest the scale level
 	 * @param newVisibleBounds the visible bounds upon the Figure
+	 * @return true if the scale changed, false if it was already at the requested scale or something went wrong.
 	 */
-	public void scaleTo(final double newScaleRequest, final Dimension newVisibleBounds) {
-		if (MathUtil.equals(this.userScale, newScaleRequest, 0.01) &&
+	public boolean scaleTo(final double newScaleRequest, final Dimension newVisibleBounds) {
+		if (MathUtil.equals(this.userScale, newScaleRequest, newScaleRequest * 0.01) &&
 			(visibleBounds_px.width == newVisibleBounds.width) &&
-			(visibleBounds_px.height == newVisibleBounds.height) )
-		{
-			return;}
+			(visibleBounds_px.height == newVisibleBounds.height) ) {
+			return false;
+		}
 		if (Double.isInfinite(newScaleRequest) || Double.isNaN(newScaleRequest) || 0 > newScaleRequest) {
-			return;}
+			return false;
+		}
 
-		this.userScale = MathUtil.clamp( newScaleRequest, MINIMUM_ZOOM, MAXIMUM_ZOOM);
+		this.userScale = newScaleRequest;
+		
 		this.scale = baseScale * userScale;
 		updateCanvasOrigin();
 
@@ -128,16 +128,18 @@ public abstract class AbstractScaleFigure extends JPanel {
 		updateCanvasSize();
 
 		this.fireChangeEvent();
+		return true;
 	}
 	
 	/**
      * Set the scale level to display newBounds
      * 
-     * @param visibleBounds the visible bounds to scale this figure to.  
+     * @param visibleBounds the visible bounds to scale this figure to.
+	 * @return true if the scale changed, false if it was already at the requested scale or something went wrong.
      */
-	public void scaleTo(Dimension visibleBounds) {
+	public boolean scaleTo(Dimension visibleBounds) {
 		if( 0 >= visibleBounds.getWidth() || 0 >= visibleBounds.getHeight())
-			return;
+			return false;
 
 		updateSubjectDimensions();
 
@@ -145,7 +147,7 @@ public abstract class AbstractScaleFigure extends JPanel {
 		final double height_scale = (visibleBounds.height - 2 * borderThickness_px.height) / (subjectBounds_m.getHeight() * baseScale);
 		final double newScale = Math.min(height_scale, width_scale);
 
-		scaleTo(newScale, visibleBounds);
+		return scaleTo(newScale, visibleBounds);
 	}
 	
     /**

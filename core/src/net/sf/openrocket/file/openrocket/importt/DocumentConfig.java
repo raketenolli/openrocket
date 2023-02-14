@@ -67,33 +67,33 @@ class DocumentConfig {
 	static {
 		try {
 			// External components
-			constructors.put("bodytube", BodyTube.class.getConstructor(new Class<?>[0]));
-			constructors.put("transition", Transition.class.getConstructor(new Class<?>[0]));
-			constructors.put("nosecone", NoseCone.class.getConstructor(new Class<?>[0]));
-			constructors.put("trapezoidfinset", TrapezoidFinSet.class.getConstructor(new Class<?>[0]));
-			constructors.put("ellipticalfinset", EllipticalFinSet.class.getConstructor(new Class<?>[0]));
-			constructors.put("freeformfinset", FreeformFinSet.class.getConstructor(new Class<?>[0]));
-			constructors.put("tubefinset", TubeFinSet.class.getConstructor(new Class<?>[0]));
-			constructors.put("launchlug", LaunchLug.class.getConstructor(new Class<?>[0]));
-			constructors.put("railbutton", RailButton.class.getConstructor(new Class<?>[0]));
+			constructors.put("bodytube", BodyTube.class.getConstructor());
+			constructors.put("transition", Transition.class.getConstructor());
+			constructors.put("nosecone", NoseCone.class.getConstructor());
+			constructors.put("trapezoidfinset", TrapezoidFinSet.class.getConstructor());
+			constructors.put("ellipticalfinset", EllipticalFinSet.class.getConstructor());
+			constructors.put("freeformfinset", FreeformFinSet.class.getConstructor());
+			constructors.put("tubefinset", TubeFinSet.class.getConstructor());
+			constructors.put("launchlug", LaunchLug.class.getConstructor());
+			constructors.put("railbutton", RailButton.class.getConstructor());
 			
 			// Internal components
-			constructors.put("engineblock", EngineBlock.class.getConstructor(new Class<?>[0]));
-			constructors.put("innertube", InnerTube.class.getConstructor(new Class<?>[0]));
-			constructors.put("tubecoupler", TubeCoupler.class.getConstructor(new Class<?>[0]));
-			constructors.put("bulkhead", Bulkhead.class.getConstructor(new Class<?>[0]));
-			constructors.put("centeringring", CenteringRing.class.getConstructor(new Class<?>[0]));
+			constructors.put("engineblock", EngineBlock.class.getConstructor());
+			constructors.put("innertube", InnerTube.class.getConstructor());
+			constructors.put("tubecoupler", TubeCoupler.class.getConstructor());
+			constructors.put("bulkhead", Bulkhead.class.getConstructor());
+			constructors.put("centeringring", CenteringRing.class.getConstructor());
 			
-			constructors.put("masscomponent", MassComponent.class.getConstructor(new Class<?>[0]));
-			constructors.put("shockcord", ShockCord.class.getConstructor(new Class<?>[0]));
-			constructors.put("parachute", Parachute.class.getConstructor(new Class<?>[0]));
-			constructors.put("streamer", Streamer.class.getConstructor(new Class<?>[0]));
+			constructors.put("masscomponent", MassComponent.class.getConstructor());
+			constructors.put("shockcord", ShockCord.class.getConstructor());
+			constructors.put("parachute", Parachute.class.getConstructor());
+			constructors.put("streamer", Streamer.class.getConstructor());
 			
 			// Other
-			constructors.put("stage", AxialStage.class.getConstructor(new Class<?>[0]));
-			constructors.put("boosterset", ParallelStage.class.getConstructor(new Class<?>[0]));
-			constructors.put("parallelstage", ParallelStage.class.getConstructor(new Class<?>[0]));
-			constructors.put("podset", PodSet.class.getConstructor(new Class<?>[0]));
+			constructors.put("stage", AxialStage.class.getConstructor());
+			constructors.put("boosterset", ParallelStage.class.getConstructor());
+			constructors.put("parallelstage", ParallelStage.class.getConstructor());
+			constructors.put("podset", PodSet.class.getConstructor());
 			
 		} catch (NoSuchMethodException e) {
 			throw new BugException(
@@ -129,8 +129,16 @@ class DocumentConfig {
 		setters.put("RocketComponent:overridecd", new OverrideSetter(
 				Reflection.findMethod(RocketComponent.class, "setOverrideCD", double.class),
 				Reflection.findMethod(RocketComponent.class, "setCDOverridden", boolean.class)));
+		// TODO: delete overridesubcomponents setters if no compatibility is needed anymore with OR 15.03
 		setters.put("RocketComponent:overridesubcomponents", new BooleanSetter(
-				Reflection.findMethod(RocketComponent.class, "setOverrideSubcomponents", boolean.class)));
+				Reflection.findMethod(RocketComponent.class, "setSubcomponentsOverridden", boolean.class)));
+
+		setters.put("RocketComponent:overridesubcomponentsmass", new BooleanSetter(
+				Reflection.findMethod(RocketComponent.class, "setSubcomponentsOverriddenMass", boolean.class)));
+		setters.put("RocketComponent:overridesubcomponentscg", new BooleanSetter(
+				Reflection.findMethod(RocketComponent.class, "setSubcomponentsOverriddenCG", boolean.class)));
+		setters.put("RocketComponent:overridesubcomponentscd", new BooleanSetter(
+				Reflection.findMethod(RocketComponent.class, "setSubcomponentsOverriddenCD", boolean.class)));
 		setters.put("RocketComponent:comment", new StringSetter(
 				Reflection.findMethod(RocketComponent.class, "setComment", String.class)));
 		setters.put("RocketComponent:preset", new ComponentPresetSetter(
@@ -152,7 +160,7 @@ class DocumentConfig {
 		// BodyTube
 		setters.put("BodyTube:radius", new DoubleSetter(
 				Reflection.findMethod(BodyTube.class, "setOuterRadius", double.class),
-				"auto",
+				"auto", " ",
 				Reflection.findMethod(BodyTube.class, "setOuterRadiusAutomatic", boolean.class)));
 
 		// Parallel Stage
@@ -163,9 +171,10 @@ class DocumentConfig {
        
 		// SymmetricComponent
 		setters.put("SymmetricComponent:thickness", new DoubleSetter(
-				Reflection.findMethod(SymmetricComponent.class, "setThickness", double.class),
+				Reflection.findMethod(SymmetricComponent.class, "setThickness", double.class, boolean.class),
 				"filled",
-				Reflection.findMethod(SymmetricComponent.class, "setFilled", boolean.class)));
+				Reflection.findMethod(SymmetricComponent.class, "setFilled", boolean.class),
+				false));
 		
 		// LaunchLug
 		setters.put("LaunchLug:instancecount", new IntSetter(
@@ -190,8 +199,17 @@ class DocumentConfig {
 		setters.put("RailButton:angleoffset",  new AnglePositionSetter() );
 		setters.put("RailButton:height",  new DoubleSetter(
 				Reflection.findMethod( RailButton.class, "setTotalHeight", double.class)));
+		setters.put("RailButton:baseheight",  new DoubleSetter(
+				Reflection.findMethod( RailButton.class, "setBaseHeight", double.class)));
+		setters.put("RailButton:flangeheight",  new DoubleSetter(
+				Reflection.findMethod( RailButton.class, "setFlangeHeight", double.class)));
+		setters.put("RailButton:screwheight",  new DoubleSetter(
+				Reflection.findMethod( RailButton.class, "setScrewHeight", double.class)));
 		setters.put("RailButton:outerdiameter",  new DoubleSetter(
 				Reflection.findMethod( RailButton.class, "setOuterDiameter", double.class)));
+		setters.put("RailButton:innerdiameter",  new DoubleSetter(
+				Reflection.findMethod( RailButton.class, "setInnerDiameter", double.class)));
+
 			
 		// Transition
 		setters.put("Transition:shape", new EnumSetter<Transition.Shape>(
@@ -203,13 +221,15 @@ class DocumentConfig {
 				Reflection.findMethod(Transition.class, "setShapeParameter", double.class)));
 		
 		setters.put("Transition:foreradius", new DoubleSetter(
-				Reflection.findMethod(Transition.class, "setForeRadius", double.class),
-				"auto",
-				Reflection.findMethod(Transition.class, "setForeRadiusAutomatic", boolean.class)));
+				Reflection.findMethod(Transition.class, "setForeRadius", double.class, boolean.class),
+				"auto", " ",
+				Reflection.findMethod(Transition.class, "setForeRadiusAutomatic", boolean.class),
+				false));
 		setters.put("Transition:aftradius", new DoubleSetter(
-				Reflection.findMethod(Transition.class, "setAftRadius", double.class),
-				"auto",
-				Reflection.findMethod(Transition.class, "setAftRadiusAutomatic", boolean.class)));
+				Reflection.findMethod(Transition.class, "setAftRadius", double.class, boolean.class),
+				"auto", " ",
+				Reflection.findMethod(Transition.class, "setAftRadiusAutomatic", boolean.class),
+				false));
 		
 		setters.put("Transition:foreshoulderradius", new DoubleSetter(
 				Reflection.findMethod(Transition.class, "setForeShoulderRadius", double.class)));
@@ -228,7 +248,9 @@ class DocumentConfig {
 				Reflection.findMethod(Transition.class, "setAftShoulderThickness", double.class)));
 		setters.put("Transition:aftshouldercapped", new BooleanSetter(
 				Reflection.findMethod(Transition.class, "setAftShoulderCapped", boolean.class)));
-		
+
+		setters.put("NoseCone:isflipped", new BooleanSetter(
+				Reflection.findMethod(NoseCone.class, "setFlipped", boolean.class, boolean.class), false));
 		// NoseCone - disable disallowed elements
 		setters.put("NoseCone:foreradius", null);
 		setters.put("NoseCone:foreshoulderradius", null);
@@ -367,9 +389,11 @@ class DocumentConfig {
 		
 		// MassObject
 		setters.put("MassObject:packedlength", new DoubleSetter(
-				Reflection.findMethod(MassObject.class, "setLength", double.class)));
+				Reflection.findMethod(MassObject.class, "setLengthNoAuto", double.class)));
 		setters.put("MassObject:packedradius", new DoubleSetter(
-				Reflection.findMethod(MassObject.class, "setRadius", double.class)));
+				Reflection.findMethod(MassObject.class, "setRadius", double.class),
+				"auto", " ",
+				Reflection.findMethod(MassObject.class, "setRadiusAutomatic", boolean.class)));
 		setters.put("MassObject:radialposition", new DoubleSetter(
 				Reflection.findMethod(MassObject.class, "setRadialPosition", double.class)));
 		setters.put("MassObject:radialdirection", new DoubleSetter(

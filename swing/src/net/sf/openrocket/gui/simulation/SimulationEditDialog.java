@@ -81,6 +81,7 @@ public class SimulationEditDialog extends JDialog {
 		if (!allowsPlotMode()) {
 			return;
 		}
+		setTitle(trans.get("simplotpanel.title.Plotsim"));
 		CardLayout cl = (CardLayout) (cards.getLayout());
 		cl.show(cards, PLOTMODE);
 		cards.validate();
@@ -150,7 +151,7 @@ public class SimulationEditDialog extends JDialog {
 			
 			final Rocket rkt = document.getRocket();
 			final FlightConfiguration config = rkt.getFlightConfiguration(simulationList[0].getFlightConfigurationId());
-			final ConfigurationComboBox configComboBox = new ConfigurationComboBox(rkt);
+			final ConfigurationComboBox configComboBox = new ConfigurationComboBox(rkt, false);
 			configComboBox.setSelectedItem(config);
 			
 			//// Select the motor configuration to use.
@@ -208,12 +209,10 @@ public class SimulationEditDialog extends JDialog {
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				copyChangesToAllSims();
-				SimulationRunDialog.runSimulations(parentWindow, SimulationEditDialog.this.document, simulationList);
-				refreshView();
-				if (allowsPlotMode()) {
+				SimulationRunDialog dialog = SimulationRunDialog.runSimulations(parentWindow, SimulationEditDialog.this.document, simulationList);
+				if (allowsPlotMode() && dialog.isAllSimulationsSuccessful()) {
+					refreshView();
 					setPlotMode();
-				} else {
-					setVisible(false);
 				}
 			}
 		});
@@ -276,9 +275,11 @@ public class SimulationEditDialog extends JDialog {
 					switch (selectedIndex) {
 					case 0:
 						ok.setText(trans.get("SimulationEditDialog.btn.plot"));
+						plotExportPanel.revalidate();
 						break;
 					case 1:
 						ok.setText(trans.get("SimulationEditDialog.btn.export"));
+						plotExportPanel.revalidate();
 						break;
 					}
 				}
@@ -289,7 +290,7 @@ public class SimulationEditDialog extends JDialog {
 				@Override
 				public void actionPerformed(ActionEvent e) {
 					// If the simulation is out of date, run the simulation.
-					if (simulationList[0].getStatus() != Simulation.Status.UPTODATE) {
+					if (!Simulation.isStatusUpToDate(simulationList[0].getStatus())) {
 						new SimulationRunDialog(SimulationEditDialog.this.parentWindow, document, simulationList[0]).setVisible(true);
 					}
 					

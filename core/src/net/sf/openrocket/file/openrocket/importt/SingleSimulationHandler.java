@@ -134,8 +134,12 @@ class SingleSimulationHandler extends AbstractElementHandler {
 			data = null;
 		else
 			data = dataHandler.getFlightData();
+
+		if (data == null) {
+			status = Status.NOT_SIMULATED;
+		}
 		
-		Simulation simulation = new Simulation(doc.getRocket(), status, name,
+		Simulation simulation = new Simulation(doc, doc.getRocket(), status, name,
 				options, extensions, data);
 		simulation.setFlightConfigurationId( idToSet );
 		

@@ -220,7 +220,7 @@ public class ParallelStageTest extends BaseTestCase {
 		
 		final double expectedRadius = coreBody.getOuterRadius() + boosterBody.getOuterRadius();
 		{
-			final Coordinate actualInstanceOffsets[] = parallelBoosterStage.getInstanceOffsets();
+			final Coordinate[] actualInstanceOffsets = parallelBoosterStage.getInstanceOffsets();
 			
 			assertEquals(" error while setting radius offset: ", 0, actualInstanceOffsets[0].x, EPSILON);
 			assertEquals(" error while setting radius offset: ", expectedRadius, actualInstanceOffsets[0].y, EPSILON);
@@ -228,7 +228,7 @@ public class ParallelStageTest extends BaseTestCase {
 			assertEquals(" error while setting radius offset: ", 0, actualInstanceOffsets[1].x, EPSILON);
 			assertEquals(" error while setting radius offset: ", -expectedRadius, actualInstanceOffsets[1].y, EPSILON);
 		}{
-			final Coordinate actualLocations[] = parallelBoosterStage.getComponentLocations();
+			final Coordinate[] actualLocations = parallelBoosterStage.getComponentLocations();
 			
 			assertEquals(" error while setting radius offset: ", 0.484, actualLocations[0].x, EPSILON);
 			assertEquals(" error while setting radius offset: ", expectedRadius, actualLocations[0].y, EPSILON);
@@ -251,7 +251,7 @@ public class ParallelStageTest extends BaseTestCase {
 		// vv function under test
 		parallelBoosterStage.setAxialOffset( AxialMethod.BOTTOM, 0.0 );
 		final double targetRadiusOffset = 0.01;
-		parallelBoosterStage.setRadius( RadiusMethod.RELATIVE, targetRadiusOffset );
+		parallelBoosterStage.setRadius( RadiusMethod.RELATIVE, RadiusMethod.RELATIVE.getRadius(parallelBoosterStage.getParent(), parallelBoosterStage, targetRadiusOffset));
 		// ^^ function under test
 
 		assertFalse(RadiusMethod.RELATIVE.clampToZero());
@@ -260,7 +260,7 @@ public class ParallelStageTest extends BaseTestCase {
 		
 		final double expectedRadius = targetRadiusOffset + coreBody.getOuterRadius() + boosterBody.getOuterRadius();
 		{
-			final Coordinate actualInstanceOffsets[] = parallelBoosterStage.getInstanceOffsets();
+			final Coordinate[] actualInstanceOffsets = parallelBoosterStage.getInstanceOffsets();
 			
 			assertEquals(" error while setting radius offset: ", 0, actualInstanceOffsets[0].x, EPSILON);
 			assertEquals(" error while setting radius offset: ", expectedRadius, actualInstanceOffsets[0].y, EPSILON);
@@ -268,7 +268,7 @@ public class ParallelStageTest extends BaseTestCase {
 			assertEquals(" error while setting radius offset: ", 0, actualInstanceOffsets[1].x, EPSILON);
 			assertEquals(" error while setting radius offset: ", -expectedRadius, actualInstanceOffsets[1].y, EPSILON);
 		}{
-			final Coordinate actualLocations[] = parallelBoosterStage.getComponentLocations();
+			final Coordinate[] actualLocations = parallelBoosterStage.getComponentLocations();
 			
 			assertEquals(" error while setting radius offset: ", 0.484, actualLocations[0].x, EPSILON);
 			assertEquals(" error while setting radius offset: ", expectedRadius, actualLocations[0].y, EPSILON);
@@ -644,15 +644,15 @@ public class ParallelStageTest extends BaseTestCase {
 
 		expectedStageNumber = 2;
 		actualStageNumber = boosterA.getStageNumber();
-		assertEquals(" init order error: core: resultant positions: ", expectedStageNumber, actualStageNumber);
+		assertEquals(" init order error: Booster A: resultant positions: ", expectedStageNumber, actualStageNumber);
 
 		expectedStageNumber = 3;
 		actualStageNumber = boosterB.getStageNumber();
-		assertEquals(" init order error: Booster A: resultant positions: ", expectedStageNumber, actualStageNumber);
+		assertEquals(" init order error: Booster B: resultant positions: ", expectedStageNumber, actualStageNumber);
 		
 		expectedStageNumber = 4;
 		actualStageNumber = boosterC.getStageNumber();
-		assertEquals(" init order error: Booster B: resultant positions: ", expectedStageNumber, actualStageNumber);
+		assertEquals(" init order error: Booster C: resultant positions: ", expectedStageNumber, actualStageNumber);
 		
 		// remove Booster B
 		coreBody.removeChild(1);
@@ -666,11 +666,11 @@ public class ParallelStageTest extends BaseTestCase {
 		assertEquals(" Stage tracking error:  removed booster A, but configuration not updated: " + treedump, expectedStageCount, actualStageCount);
 		
 		ParallelStage boosterD = createExtraBooster();
-		boosterC.setName("Booster D Stage");
+		boosterD.setName("Booster D Stage");
 		coreBody.addChild(boosterD);
-		boosterC.setAxialOffset(AxialMethod.BOTTOM, 0);
+		boosterD.setAxialOffset(AxialMethod.BOTTOM, 0);
 		
-		expectedStageNumber = 3;
+		expectedStageNumber = 4;
 		actualStageNumber = boosterD.getStageNumber();
 		assertEquals(" init order error: Booster D: resultant positions: ", expectedStageNumber, actualStageNumber);
 		

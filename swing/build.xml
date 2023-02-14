@@ -64,18 +64,21 @@
 	<target name="clean" description="Removes all build artifacts">
 		<delete dir="${build.dir}"/>
 		<delete dir="${tmp.dir}/"/>
+		<delete dir="${resources.dir}/datafiles/components"/>
 	</target>
 		
 	
 	<!-- BUILD -->
 	<target name="build">
+		<echo level="info">Java/JVM version: ${ant.java.version}</echo>
+		<echo level="info">Java/JVM detail version: ${java.version}</echo>
 		<mkdir dir="${classes.dir}"/>
 		<echo level="info">Compiling main classes</echo>
 		<javac debug="true" srcdir="${src.dir}" destdir="${classes.dir}" classpathref="classpath" includeantruntime="false" source="1.8" target="1.8"/>
 	</target>
 	
 	<!-- Executible Eclipse-Jar-In-Jar style JAR -->
-	<target name="jar" depends="build,serialize-presets" description="Create the OpenRocket executable JAR">
+	<target name="jar" depends="build,copy-orc-files" description="Create the OpenRocket executable JAR">
 		<mkdir dir="${jar.dir}" />
 		<jar destfile="${jar.file}" basedir="${classes.dir}">
 			<manifest>
@@ -95,6 +98,12 @@
 			<zipfileset src="${core.dir}/lib/guava-26.0-jre.jar" />
 			<zipfileset src="${core.dir}/lib/guice-4.2.3-no_aop.jar" />
 			<zipfileset src="${core.dir}/lib/aopalliance.jar"/>
+			<zipfileset src="${core.dir}/lib/commonmark-0.19.0.jar"/>
+			<zipfileset src="${core.dir}/lib/icu4j-71.1.jar"/>
+			<zipfileset src="${core.dir}/lib/js-22.1.0.1.jar"/>
+			<zipfileset src="${core.dir}/lib/graal-sdk-22.1.0.1.jar"/>
+			<zipfileset src="${core.dir}/lib/js-scriptengine-22.1.0.1.jar"/>
+			<zipfileset src="${core.dir}/lib/truffle-api-22.1.0.1.jar"/>
 			<zipfileset src="${core.dir}/lib/script-api-1.0.jar"/>
 			<zipfileset src="${lib.dir}/iText-5.0.2.jar"/>
 			<zipfileset src="${core.dir}/lib/istack-commons-runtime.jar"/>
@@ -107,12 +116,13 @@
 			<zipfileset src="${core.dir}/lib/jaxb-runtime.2.3.1.jar"/>
 			<zipfileset src="${lib.dir}/jcommon-1.0.18.jar"/>
 			<zipfileset src="${lib.dir}/jfreechart-1.0.15.jar"/>
-			<zipfileset src="${core.dir}/lib/opencsv-4.3.2.jar"/>
+			<zipfileset src="${core.dir}/lib/opencsv-5.7.1.jar"/>
+			<zipfileset src="${core.dir}/lib/commons-lang3-3.12.0.jar"/>
 			<zipfileset src="${core.dir}/lib/annotation-detector-3.0.5.jar"/>
 			<zipfileset src="${core.dir}/lib/slf4j-api-1.7.30.jar"/>
-			<zipfileset src="${core.dir}/lib/logback-classic-1.2.3.jar"/>
-			<zipfileset src="${core.dir}/lib/logback-core-1.2.3.jar"/>
-			<zipfileset src="${lib.dir}/rsyntaxtextarea-2.5.6.jar"/>
+			<zipfileset src="${core.dir}/lib/logback-classic-1.2.11.jar"/>
+			<zipfileset src="${core.dir}/lib/logback-core-1.2.11.jar"/>
+			<zipfileset src="${lib.dir}/rsyntaxtextarea-3.2.0.jar"/>
 
 			<!-- JOGL libraries need to be jar-in-jar -->
 			<zipfileset dir="${lib.dir}/jogl" prefix="lib">
@@ -123,14 +133,6 @@
 			<fileset dir="${basedir}" includes="LICENSE.TXT README.TXT ChangeLog ReleaseNotes fileformat.txt" />
 		</jar>
 	</target>
-	
-	<target name="serialize-presets" depends="build" description="Preprocess the orc preset files into serialized form">
-	    <java classname="net.sf.openrocket.utils.SerializePresets"
-	          fork="true"
-			  classpathref="run-classpath"
-			  failonerror="true">
-	    </java>
-	</target>
 
 	<!-- CONVERT vendor csv to ORC files -->
 	<macrodef name="build-orc-file">
@@ -138,12 +140,12 @@
 		<attribute name="vendor"/>
 		<sequential>
 			<echo>Generating ORC file for vendor @{vendor}</echo>
-			<java classname="net.sf.openrocket.preset.loader.RocksimComponentFileTranslator"
+			<java classname="net.sf.openrocket.utils.RockSimComponentFileTranslator"
 				fork="true"
 				classpathref="run-classpath"
 				failonerror="true">
 				<arg value="@{dir}"/>
-				<arg value="${resources-src.dir}/datafiles/presets/@{vendor}.orc"/>
+				<arg value="${resources-src.dir}/datafiles/components-openrocket/@{vendor}-legacy.orc"/>
 			</java>
 		</sequential>
 	</macrodef>
@@ -153,7 +155,7 @@
 		depends="build">
 
 		<for param="vendor-dir">
-			<dirset dir="${resources-src.dir}/datafiles/rocksim_components"
+			<dirset dir="${resources-src.dir}/datafiles/rocksim_src"
 				includes="*"/>
 			<sequential>
 				<propertyregex property="vendor"
@@ -165,7 +167,53 @@
 			</sequential>
 		</for>
 	</target>
-	
+
+	<!-- COPY orc files from source directories to build directory	-->
+	<target name="check-database" description="check component database">
+		<available file="${resources-src.dir}/datafiles/components-dbcook/orc" property="database"/>
+	</target>
+
+	<target name="copy-orc-files" depends="check-database"
+		description="Copy orc files">
+
+		<fail message="NOTE: ${line.separator}
+The component database is now a submodule, and must be included into ${line.separator}
+this project to build the .jar file. ${line.separator}
+${line.separator}
+If you retrieved this code by cloning the openrocket repository, you ${line.separator}
+must initialize and update the submodule.  From the command line, ${line.separator}
+this can be accomplished with ${line.separator}
+% git submodule init ${line.separator}
+% git submodule update ${line.separator}
+${line.separator}
+If you retrieved this code by downloading and uncompressing a zip file, ${line.separator}
+you must do the same for the submodule.  Download the code ${line.separator}
+from https://github.com/dbcook/openrocket-database and uncompress it.${line.separator}
+Copy the files and directories under openrocket-database-master ${line.separator}
+into ${resources-src.dir}/datafiles/components-dbcook/ ${line.separator}
+${line.separator}
+After including the database submodule, you will be able to build
+${line.separator}
+the .jar file
+">
+	  		<condition>
+				<not>
+					<isset property="database" />
+				</not>
+			</condition>
+	  	</fail>
+	  	<copy todir="${resources.dir}/datafiles/components">
+			<fileset dir="${resources-src.dir}/datafiles/components-openrocket"/>
+	  	</copy>
+	  	<copy todir="${resources.dir}/datafiles/components">
+			<fileset dir="${resources-src.dir}/datafiles/components-dbcook/orc"/>
+	  	</copy>
+	  	<copy
+		    file="${resources-src.dir}/datafiles/components-dbcook/LICENSE"
+		    todir="${resources.dir}/datafiles/components">
+	  	</copy>
+	</target>
+
 	<!-- DIST-SRC -->
 	<target name="dist-src">
 		<echo>			
@@ -270,11 +318,15 @@ ${nonascii}</fail>
 	
 	<!--  Unit tests  -->
 	<target name="unittest" description="Execute unit tests" depends="build">
-		<echo>Building unit tests</echo>
+		<echo level="info">Building unit tests</echo>
+		<echo level="info">Java/JVM version: ${ant.java.version}</echo>
+		<echo level="info">Java/JVM detail version: ${java.version}</echo>
 		<mkdir dir="${build-test.dir}"/>
 		<javac debug="true" srcdir="${src-test.dir}" destdir="${build-test.dir}" classpathref="test-classpath"/>
 		
-		<echo>Running unit tests</echo>
+		<echo level="info">Running unit tests</echo>
+		<echo level="info">Java/JVM version: ${ant.java.version}</echo>
+		<echo level="info">Java/JVM detail version: ${java.version}</echo>
 		<mkdir dir="${tmp.dir}/rawtestoutput"/>
 		<junit fork="yes" forkmode="once" printsummary="false" failureproperty="junit.failure">
 			<classpath>

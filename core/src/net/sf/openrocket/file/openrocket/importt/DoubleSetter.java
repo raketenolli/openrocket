@@ -1,5 +1,6 @@
 package net.sf.openrocket.file.openrocket.importt;
 
+import java.util.Arrays;
 import java.util.HashMap;
 
 import net.sf.openrocket.aerodynamics.Warning;
@@ -17,6 +18,8 @@ class DoubleSetter implements Setter {
 	private final String specialString;
 	private final Reflection.Method specialMethod;
 	private final double multiplier;
+	private String separator;
+	private Object[] extraParameters = null;
 	
 	/**
 	 * Set only the double value.
@@ -42,22 +45,43 @@ class DoubleSetter implements Setter {
 		this.specialMethod = null;
 		this.multiplier = mul;
 	}
-	
+
 	/**
 	 * Set the double value, or if the value equals the special string, use the
 	 * special setter and set it to true.
-	 * 
+	 *
 	 * @param set			double setter.
 	 * @param special		special string
 	 * @param specialMethod	boolean setter.
+	 * @param parameters	(optional) extra parameter set to use for the setter method.
 	 */
 	public DoubleSetter(Reflection.Method set, String special,
-			Reflection.Method specialMethod) {
+						Reflection.Method specialMethod, Object... parameters) {
 		this.setMethod = set;
 		this.configGetter = null;
 		this.specialString = special;
 		this.specialMethod = specialMethod;
 		this.multiplier = 1.0;
+		this.extraParameters = parameters;
+	}
+
+	/**
+	 * Set the double value, or if the value equals the special string, use the
+	 * special setter and set it to true. If the input string contains more information
+	 * besides the special string, you can specify which separator should be used for
+	 * this extra information. The part before the separator is then the special string
+	 * and the part after the separator is the set value.
+	 *
+	 * @param set			double setter.
+	 * @param special		special string
+	 * @param specialMethod	boolean setter.
+	 * @param parameters	(optional) extra parameter set to use for the setter method.
+	 */
+	public DoubleSetter(Reflection.Method set, String special, String separator,
+						Reflection.Method specialMethod, Object... parameters) {
+		this(set, special, specialMethod);
+		this.separator = separator;
+		this.extraParameters = parameters;
 	}
 	
 	
@@ -80,26 +104,45 @@ class DoubleSetter implements Setter {
 			WarningSet warnings) {
 		
 		s = s.trim();
-		
-		// Check for special case
-		if (specialMethod != null && s.equalsIgnoreCase(specialString)) {
-			specialMethod.invoke(c, true);
-			return;
+		String special = s;
+		String data = s;
+		String[] args = null;
+
+		// Extract special string and data if s contains multiple data elements, separated by separator
+		if (separator != null) {
+			args = s.split(this.separator);
+			if (args.length > 1) {
+				special = args[0];
+				data = String.join(separator, Arrays.copyOfRange(args, 1, args.length));
+			}
 		}
 		
 		// Normal case
-		try {
-			double d = Double.parseDouble(s);
-			
-			if (configGetter == null) {
-				setMethod.invoke(c, d * multiplier);
-			} else {
-				FlightConfigurableParameterSet<?> config = (FlightConfigurableParameterSet<?>) configGetter.invoke(c);
-				Object obj = config.getDefault();
-				setMethod.invoke(obj, d * multiplier);
+		if (!special.equalsIgnoreCase(specialString) || (args != null && args.length > 1)) {
+			try {
+				double d = Double.parseDouble(data);
+
+				Object obj = c;
+				if (configGetter != null) {
+					FlightConfigurableParameterSet<?> config = (FlightConfigurableParameterSet<?>) configGetter.invoke(c);
+					obj = config.getDefault();
+				}
+				if (extraParameters != null) {
+					Object[] parameters = new Object[extraParameters.length + 1];
+					parameters[0] = d * multiplier;
+					System.arraycopy(extraParameters, 0, parameters, 1, extraParameters.length);
+					setMethod.invoke(obj, parameters);
+				} else {
+					setMethod.invoke(obj, d * multiplier);
+				}
+			} catch (NumberFormatException e) {
+				warnings.add(Warning.FILE_INVALID_PARAMETER + " data: '" + data + "' - " + c.getName());
 			}
-		} catch (NumberFormatException e) {
-			warnings.add(Warning.FILE_INVALID_PARAMETER);
+		}
+
+		// Check for special case
+		if (specialMethod != null && special.equalsIgnoreCase(specialString)) {
+			specialMethod.invoke(c, true);
 		}
 	}
 }

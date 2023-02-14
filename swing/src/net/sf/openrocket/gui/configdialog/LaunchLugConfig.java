@@ -1,7 +1,7 @@
 package net.sf.openrocket.gui.configdialog;
 
 
-import javax.swing.JComboBox;
+import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JSpinner;
@@ -9,32 +9,28 @@ import javax.swing.JSpinner;
 import net.miginfocom.swing.MigLayout;
 import net.sf.openrocket.document.OpenRocketDocument;
 import net.sf.openrocket.gui.SpinnerEditor;
+import net.sf.openrocket.gui.adaptors.CustomFocusTraversalPolicy;
 import net.sf.openrocket.gui.adaptors.DoubleModel;
-import net.sf.openrocket.gui.adaptors.EnumModel;
 import net.sf.openrocket.gui.components.BasicSlider;
 import net.sf.openrocket.gui.components.UnitSelector;
 import net.sf.openrocket.l10n.Translator;
 import net.sf.openrocket.material.Material;
 import net.sf.openrocket.rocketcomponent.RocketComponent;
-import net.sf.openrocket.rocketcomponent.position.AxialMethod;
 import net.sf.openrocket.startup.Application;
 import net.sf.openrocket.unit.UnitGroup;
-
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 
 @SuppressWarnings("serial")
 public class LaunchLugConfig extends RocketComponentConfig {
 	
 	private static final Translator trans = Application.getTranslator();
 	
-	public LaunchLugConfig(OpenRocketDocument d, RocketComponent c) {
-		super(d, c);
+	public LaunchLugConfig(OpenRocketDocument d, RocketComponent c, JDialog parent) {
+		super(d, c, parent);
 		
-		JPanel primary = new JPanel(new MigLayout("fill"));
+		JPanel primary = new JPanel(new MigLayout());
 		
 		
-		JPanel panel = new JPanel(new MigLayout("gap rel unrel", "[][65lp::][30lp::][]", ""));
+		JPanel panel = new JPanel(new MigLayout("gap rel unrel, ins 0", "[][65lp::][30lp::][]", ""));
 		
 		////  Body tube length
 		//// Length:
@@ -44,10 +40,12 @@ public class LaunchLugConfig extends RocketComponentConfig {
 		
 		JSpinner spin = new JSpinner(m.getSpinnerModel());
 		spin.setEditor(new SpinnerEditor(spin));
+		focusElement = spin;
 		panel.add(spin, "growx");
+		order.add(((SpinnerEditor) spin.getEditor()).getTextField());
 		
 		panel.add(new UnitSelector(m), "growx");
-		panel.add(new BasicSlider(m.getSliderModel(0, 0.02, 0.1)), "w 100lp, wrap para");
+		panel.add(new BasicSlider(m.getSliderModel(0, 0.02, 0.1)), "w 100lp, wrap 20lp");
 		
 		
 		//// Body tube diameter
@@ -60,6 +58,7 @@ public class LaunchLugConfig extends RocketComponentConfig {
 		spin = new JSpinner(od.getSpinnerModel());
 		spin.setEditor(new SpinnerEditor(spin));
 		panel.add(spin, "growx");
+		order.add(((SpinnerEditor) spin.getEditor()).getTextField());
 		
 		panel.add(new UnitSelector(od), "growx");
 		panel.add(new BasicSlider(od.getSliderModel(0, 0.04, 0.2)), "w 100lp, wrap rel");
@@ -75,6 +74,7 @@ public class LaunchLugConfig extends RocketComponentConfig {
 		spin = new JSpinner(m.getSpinnerModel());
 		spin.setEditor(new SpinnerEditor(spin));
 		panel.add(spin, "growx");
+		order.add(((SpinnerEditor) spin.getEditor()).getTextField());
 		
 		panel.add(new UnitSelector(m), "growx");
 		panel.add(new BasicSlider(m.getSliderModel(new DoubleModel(0), od)), "w 100lp, wrap rel");
@@ -89,66 +89,52 @@ public class LaunchLugConfig extends RocketComponentConfig {
 		spin = new JSpinner(m.getSpinnerModel());
 		spin.setEditor(new SpinnerEditor(spin));
 		panel.add(spin, "growx");
+		order.add(((SpinnerEditor) spin.getEditor()).getTextField());
 		
 		panel.add(new UnitSelector(m), "growx");
-		panel.add(new BasicSlider(m.getSliderModel(0, 0.01)), "w 100lp, wrap 20lp");
+		panel.add(new BasicSlider(m.getSliderModel(0, 0.01)), "w 100lp, wrap");
 		
-		
-		////  Radial position:
-		panel.add(new JLabel(trans.get("LaunchLugCfg.lbl.Angle")));
-		
-		m = new DoubleModel(component, "AngleOffset", UnitGroup.UNITS_ANGLE, -180, 180);
-		
-		spin = new JSpinner(m.getSpinnerModel());
-		spin.setEditor(new SpinnerEditor(spin));
-		panel.add(spin, "growx");
-		
-		panel.add(new UnitSelector(m), "growx");
-		panel.add(new BasicSlider(m.getSliderModel(-Math.PI, Math.PI) ), "w 100lp, wrap");
-		
-		// finish up the left column
-		primary.add(panel, "grow, gapright 20lp");
-		
-		// create a new panel for the right column
-		panel = new JPanel(new MigLayout("gap rel unrel", "[][65lp::][30lp::][]", ""));
+		primary.add(panel, "grow, gapright 40lp");
 
-		//// Position relative to:
-		panel.add(new JLabel(trans.get("LaunchLugCfg.lbl.Posrelativeto")));		
-		EnumModel<AxialMethod> positionModel = new EnumModel<AxialMethod>(component, "AxialMethod", AxialMethod.axialOffsetMethods );
-		JComboBox<AxialMethod> positionCombo = new JComboBox<AxialMethod>( positionModel );
-		panel.add(positionCombo, "spanx, growx, wrap");
-		
-		//// plus
-		final DoubleModel mAxOff = new DoubleModel(component, "AxialOffset", UnitGroup.UNITS_LENGTH);
-		panel.add(new JLabel(trans.get("LaunchLugCfg.lbl.plus")), "right");
-		spin = new JSpinner(mAxOff.getSpinnerModel());				// Plus quantity input
-		spin.setEditor(new SpinnerEditor(spin));
-		panel.add(spin, "growx");
-		
-		panel.add(new UnitSelector(mAxOff), "growx");		// Unity selection
-		panel.add(new BasicSlider(mAxOff.getSliderModel(			// Plus quantity slider
-				new DoubleModel(component.getParent(), "Length", -1.0, UnitGroup.UNITS_NONE),
-				new DoubleModel(component.getParent(), "Length"))),
-				"w 100lp, wrap para");
+		// Right panel
+		panel = new JPanel(new MigLayout("gap rel unrel, ins 0", "[][65lp::][30lp::][]", ""));
 
-		// Add an action listener to update the plus quantity, based on the selected reference point
-		positionCombo.addActionListener(new ActionListener() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				mAxOff.stateChanged(e);
-			}
-		});
-		
+		{//// Placement
+			//// Position relative to:
+			JPanel placementPanel = new PlacementPanel(component, order);
+			panel.add(placementPanel, "span, grow, wrap");
+
+			////  Rotation:
+			placementPanel.add(new JLabel(trans.get("LaunchLugCfg.lbl.Angle")), "newline");
+
+			m = new DoubleModel(component, "AngleOffset", UnitGroup.UNITS_ANGLE, -Math.PI, Math.PI);
+
+			spin = new JSpinner(m.getSpinnerModel());
+			spin.setEditor(new SpinnerEditor(spin));
+			placementPanel.add(spin, "growx");
+			order.add(((SpinnerEditor) spin.getEditor()).getTextField());
+
+			placementPanel.add(new UnitSelector(m), "growx");
+			placementPanel.add(new BasicSlider(m.getSliderModel()), "w 100lp, wrap");
+		}
+
 		//// Material
-		panel.add(materialPanel( Material.Type.BULK), "span, wrap");
-		
-		
+		MaterialPanel materialPanel = new MaterialPanel(component, document, Material.Type.BULK, order);
+		panel.add(materialPanel, "span, grow, wrap");
+
 		primary.add(panel, "grow");
 		
 		//// General and General properties
 		tabbedPane.insertTab(trans.get("LaunchLugCfg.tab.General"), null, primary,
 				trans.get("LaunchLugCfg.tab.Generalprop"), 0);
 		tabbedPane.setSelectedIndex(0);
+
+		// Apply the custom focus travel policy to this config dialog
+		//// Make sure the cancel & ok button is the last component
+		order.add(cancelButton);
+		order.add(okButton);
+		CustomFocusTraversalPolicy policy = new CustomFocusTraversalPolicy(order);
+		parent.setFocusTraversalPolicy(policy);
 	}
 	
 	@Override

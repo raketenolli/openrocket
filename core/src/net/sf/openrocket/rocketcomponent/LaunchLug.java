@@ -2,10 +2,7 @@ package net.sf.openrocket.rocketcomponent;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.EventObject;
 
-import net.sf.openrocket.appearance.Appearance;
-import net.sf.openrocket.appearance.Decal;
 import net.sf.openrocket.l10n.Translator;
 import net.sf.openrocket.preset.ComponentPreset;
 import net.sf.openrocket.preset.ComponentPreset.Type;
@@ -14,10 +11,9 @@ import net.sf.openrocket.startup.Application;
 import net.sf.openrocket.util.BoundingBox;
 import net.sf.openrocket.util.Coordinate;
 import net.sf.openrocket.util.MathUtil;
-import net.sf.openrocket.util.StateChangeListener;
 
 
-public class LaunchLug extends ExternalComponent implements AnglePositionable, BoxBounded, Coaxial, LineInstanceable, InsideColorComponent {
+public class LaunchLug extends Tube implements AnglePositionable, BoxBounded, LineInstanceable, InsideColorComponent {
 	
 	private static final Translator trans = Application.getTranslator();
 	
@@ -30,7 +26,7 @@ public class LaunchLug extends ExternalComponent implements AnglePositionable, B
 	private int instanceCount = 1;
 	private double instanceSeparation = 0; // front-front along the positive rocket axis. i.e. [1,0,0];
 
-	private final InsideColorComponentHandler insideColorComponentHandler = new InsideColorComponentHandler(this);
+	private InsideColorComponentHandler insideColorComponentHandler = new InsideColorComponentHandler(this);
 	
 	public LaunchLug() {
 		super(AxialMethod.MIDDLE);
@@ -49,6 +45,12 @@ public class LaunchLug extends ExternalComponent implements AnglePositionable, B
 	
 	@Override
 	public void setOuterRadius(double radius) {
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof LaunchLug) {
+				((LaunchLug) listener).setOuterRadius(radius);
+			}
+		}
+
 		if (MathUtil.equals(this.radius, radius))
 			return;
 		this.radius = radius;
@@ -64,6 +66,12 @@ public class LaunchLug extends ExternalComponent implements AnglePositionable, B
 	
 	@Override
 	public void setInnerRadius(double innerRadius) {
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof LaunchLug) {
+				((LaunchLug) listener).setInnerRadius(innerRadius);
+			}
+		}
+
 		setOuterRadius(innerRadius + thickness);
 	}
 	
@@ -73,6 +81,12 @@ public class LaunchLug extends ExternalComponent implements AnglePositionable, B
 	}
 	
 	public void setThickness(double thickness) {
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof LaunchLug) {
+				((LaunchLug) listener).setThickness(thickness);
+			}
+		}
+
 		if (MathUtil.equals(this.thickness, thickness))
 			return;
 		this.thickness = MathUtil.clamp(thickness, 0, radius);
@@ -87,6 +101,12 @@ public class LaunchLug extends ExternalComponent implements AnglePositionable, B
 	
 	@Override
 	public void setAngleOffset(double newAngleRadians) {
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof LaunchLug) {
+				((LaunchLug) listener).setAngleOffset(newAngleRadians);
+			}
+		}
+
 		double clamped_rad = MathUtil.clamp( newAngleRadians, -Math.PI, Math.PI);
 		if (MathUtil.equals(this.angleOffsetRadians, clamped_rad))
 			return;
@@ -95,6 +115,12 @@ public class LaunchLug extends ExternalComponent implements AnglePositionable, B
 	}
 	
 	public void setLength(double length) {
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof LaunchLug) {
+				((LaunchLug) listener).setLength(length);
+			}
+		}
+
 		if (MathUtil.equals(this.length, length))
 			return;
 		this.length = length;
@@ -242,11 +268,23 @@ public class LaunchLug extends ExternalComponent implements AnglePositionable, B
 	
 	@Override
 	public void setInstanceSeparation(final double _separation){
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof LaunchLug) {
+				((LaunchLug) listener).setInstanceSeparation(_separation);
+			}
+		}
+
 		this.instanceSeparation = _separation;
 	}
 	
 	@Override
 	public void setInstanceCount( final int newCount ){
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof LaunchLug) {
+				((LaunchLug) listener).setInstanceCount(newCount);
+			}
+		}
+
 		if( 0 < newCount ){
 			this.instanceCount = newCount;
 		}
@@ -290,5 +328,10 @@ public class LaunchLug extends ExternalComponent implements AnglePositionable, B
 	@Override
 	public InsideColorComponentHandler getInsideColorComponentHandler() {
 		return this.insideColorComponentHandler;
+	}
+
+	@Override
+	public void setInsideColorComponentHandler(InsideColorComponentHandler handler) {
+		this.insideColorComponentHandler = handler;
 	}
 }

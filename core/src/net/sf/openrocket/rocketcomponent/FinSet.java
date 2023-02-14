@@ -1,12 +1,11 @@
 package net.sf.openrocket.rocketcomponent;
 
 import java.awt.geom.Point2D;
+import java.util.*;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
 
 
+import net.sf.openrocket.util.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,15 +17,10 @@ import net.sf.openrocket.rocketcomponent.position.AxialMethod;
 import net.sf.openrocket.rocketcomponent.position.AxialPositionable;
 import net.sf.openrocket.rocketcomponent.position.RadiusMethod;
 import net.sf.openrocket.startup.Application;
-import net.sf.openrocket.util.BoundingBox;
 
 import net.sf.openrocket.rocketcomponent.Transition.Shape;
 
-import net.sf.openrocket.util.Coordinate;
-import net.sf.openrocket.util.MathUtil;
-import net.sf.openrocket.util.Transformation;
-
-public abstract class FinSet extends ExternalComponent implements AxialPositionable, BoxBounded, RingInstanceable {
+public abstract class FinSet extends ExternalComponent implements AxialPositionable, BoxBounded, RingInstanceable, InsideColorComponent {
 	private static final Logger log = LoggerFactory.getLogger(FinSet.class);
 	private static final Translator trans = Application.getTranslator();
 
@@ -34,8 +28,17 @@ public abstract class FinSet extends ExternalComponent implements AxialPositiona
 	 * Maximum allowed cant of fins.
 	 */
 	public static final double MAX_CANT_RADIANS = (15.0 * Math.PI / 180);
-	
-	public enum CrossSection {
+
+	/**
+	 * Maximum number of root points in the root geometry.
+	 */
+	private static final int MAX_ROOT_DIVISIONS = 100;
+	private static final int MAX_ROOT_DIVISIONS_LOW_RES = MAX_ROOT_DIVISIONS / 5;
+
+    public void setOverrideMass() {
+    }
+
+    public enum CrossSection {
 		//// Square
 		SQUARE(trans.get("FinSet.CrossSection.SQUARE"), 1.00),
 		//// Rounded
@@ -107,7 +110,7 @@ public abstract class FinSet extends ExternalComponent implements AxialPositiona
 	private static final double minimumTabArea = 1e-8;
 	private double tabHeight = 0;
 	private double tabLength = 0.05;
-	// this is always measured from the the root-lead point.
+	// this is always measured from the root-lead point.
 	private double tabPosition = 0.0;
 	private AxialMethod tabOffsetMethod = AxialMethod.MIDDLE;
 	private double tabOffset = 0.;
@@ -125,6 +128,8 @@ public abstract class FinSet extends ExternalComponent implements AxialPositiona
 	private double singlePlanformArea = Double.NaN;
 	private double totalVolume = Double.NaN;
 	private Coordinate centerOfMass = Coordinate.NaN;
+
+	private InsideColorComponentHandler insideColorComponentHandler = new InsideColorComponentHandler(this);
 	
 	/**
 	 * New FinSet with given number of fins and given base rotation angle.
@@ -156,6 +161,12 @@ public abstract class FinSet extends ExternalComponent implements AxialPositiona
 	 * @param n The number of fins, greater of equal to one.
 	 */
 	public void setFinCount(int n) {
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof FinSet) {
+				((FinSet) listener).setFinCount(n);
+			}
+		}
+
 		if (finCount == n)
 			return;
 		if (n < 1)
@@ -191,6 +202,12 @@ public abstract class FinSet extends ExternalComponent implements AxialPositiona
 	 * @param r The base rotation in radians
 	 */
 	public void setBaseRotation(double r) {
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof FinSet) {
+				((FinSet) listener).setBaseRotation(r);
+			}
+		}
+
 		setAngleOffset(r);
 	}
 	
@@ -206,12 +223,18 @@ public abstract class FinSet extends ExternalComponent implements AxialPositiona
 	 * @param newCantRadians -- new cant angle, in radians
 	 */
 	public void setCantAngle(final double newCantRadians) {
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof FinSet) {
+				((FinSet) listener).setCantAngle(newCantRadians);
+			}
+		}
+
 		final double clampedCant = MathUtil.clamp(newCantRadians, -MAX_CANT_RADIANS, MAX_CANT_RADIANS);
 		if (MathUtil.equals(clampedCant, this.cantRadians))
 			return;
 		this.cantRadians = clampedCant;
-		
-		fireComponentChangeEvent(ComponentChangeEvent.BOTH_CHANGE);
+
+		fireComponentChangeEvent(ComponentChangeEvent.AERODYNAMIC_CHANGE);
 	}
 
 	public Transformation getCantRotation() {
@@ -230,6 +253,12 @@ public abstract class FinSet extends ExternalComponent implements AxialPositiona
 	}
 	
 	public void setThickness(double r) {
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof FinSet) {
+				((FinSet) listener).setThickness(r);
+			}
+		}
+
 		if (thickness == r)
 			return;
 		thickness = Math.max(r, 0);
@@ -242,6 +271,12 @@ public abstract class FinSet extends ExternalComponent implements AxialPositiona
 	}
 	
 	public void setCrossSection(CrossSection cs) {
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof FinSet) {
+				((FinSet) listener).setCrossSection(cs);
+			}
+		}
+
 		if (crossSection == cs)
 			return;
 		crossSection = cs;
@@ -269,12 +304,19 @@ public abstract class FinSet extends ExternalComponent implements AxialPositiona
 	 * 
 	 */
 	public void setTabHeight(final double newTabHeight) {
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof FinSet) {
+				((FinSet) listener).setTabHeight(newTabHeight);
+			}
+		}
+
 		if (MathUtil.equals(this.tabHeight, MathUtil.max(newTabHeight, 0))){
 			return;
 		}
 		
 		tabHeight = newTabHeight;
-
+		double maxTabHeight = getMaxTabHeight();
+		this.tabHeight = Math.min(this.tabHeight,  maxTabHeight);
 		fireComponentChangeEvent(ComponentChangeEvent.MASS_CHANGE);
 	}
 	
@@ -287,13 +329,25 @@ public abstract class FinSet extends ExternalComponent implements AxialPositiona
 	 * set tab length
 	 */
 	public void setTabLength(final double lengthRequest) {
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof FinSet) {
+				((FinSet) listener).setTabLength(lengthRequest);
+			}
+		}
+
 		if (MathUtil.equals(tabLength, MathUtil.max(lengthRequest, 0))) {
 			return;
 		}
 		
 		tabLength = lengthRequest;
 		
+		updateTabPosition();
+		
 		fireComponentChangeEvent(ComponentChangeEvent.MASS_CHANGE);
+	}
+
+	public void updateTabPosition(){
+		this.tabPosition = this.tabOffsetMethod.getAsPosition(tabOffset, tabLength, length);
 	}
 	
 	/** 
@@ -302,8 +356,14 @@ public abstract class FinSet extends ExternalComponent implements AxialPositiona
 	 * @param offsetRequest new requested tab offset
 	 */
 	public void setTabOffset( final double offsetRequest) {
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof FinSet) {
+				((FinSet) listener).setTabOffset(offsetRequest);
+			}
+		}
+
 		tabOffset = offsetRequest;
-		tabPosition = tabOffsetMethod.getAsPosition( tabOffset, tabLength, length);
+		updateTabPosition();
 		
 		fireComponentChangeEvent(ComponentChangeEvent.MASS_CHANGE);
 	}
@@ -317,8 +377,15 @@ public abstract class FinSet extends ExternalComponent implements AxialPositiona
 	 * it is merely a lens through which other modules may view the tab's position.
      */
 	public void setTabOffsetMethod(final AxialMethod newPositionMethod) {
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof FinSet) {
+				((FinSet) listener).setTabOffsetMethod(newPositionMethod);
+			}
+		}
+
 		this.tabOffsetMethod = newPositionMethod;
-		this.tabOffset = tabOffsetMethod.getAsOffset( tabPosition, tabLength, length);
+		this.tabOffset = this.tabOffsetMethod.getAsOffset(tabPosition, tabLength, length);
+		
 		fireComponentChangeEvent(ComponentChangeEvent.NONFUNCTIONAL_CHANGE);
 	}
 	
@@ -329,8 +396,12 @@ public abstract class FinSet extends ExternalComponent implements AxialPositiona
 		return tabPosition;
 	}
 
+	public double getTabOffset(AxialMethod method){
+		return method.getAsOffset(tabPosition, tabLength, length);
+	}
+
 	public double getTabOffset(){
-		return this.tabOffsetMethod.getAsOffset(tabPosition, tabLength, length);
+		return getTabOffset(this.tabOffsetMethod);
 	}
 
 	/**
@@ -340,37 +411,90 @@ public abstract class FinSet extends ExternalComponent implements AxialPositiona
 		return tabPosition + tabLength;
 	}
 	
-	public void validateFinTab(){
-		this.tabPosition = this.tabOffsetMethod.getAsPosition(tabOffset, tabLength, length);
-
+	public void validateFinTabPosition() {
 		//check front bounds:
-		if( tabPosition < 0){
+		if (tabPosition < 0) {
 			this.tabPosition = 0;
 		}
 
 		//check tail bounds:
-		if (this.length < tabPosition ) {
+		if (this.length < tabPosition) {
 			this.tabPosition = length;
 		}
+	}
+	
+	public void validateFinTabLength() {
+		//System.err.println(String.format("    >> Fin Tab Length: %.6f @ %.6f", tabLength, tabOffset));
+		
 		final double xTabBack = getTabTrailingEdge();
-		if( this.length < xTabBack ){
+		if (this.length < xTabBack) {
 			this.tabLength -= (xTabBack - this.length);
 		}
-
+		
 		tabLength = Math.max(0, tabLength);
+		
+		//System.err.println(String.format("    << Fin Tab Length: %.6f @ %.6f", tabLength, tabOffset));
+	}
 
-		// check tab height 
-		if( null != getParent() ){
+	/**
+	 * Calculates the maximum height that the fin tabs can be, depending on the parent shape.
+	 * @return maximum tab height value
+	 */
+	public double getMaxTabHeight() {
+		Double radiusFront = getParentFrontRadius();
+		Double radiusTrailing = getParentTrailingRadius();
+		if (radiusFront != null && radiusTrailing != null) {
+			return MathUtil.min(radiusFront, radiusTrailing);
+		}
+		return Double.MAX_VALUE;
+	}
+
+	/**
+	 * Returns the radius of the parent at the front of the fin, or null if no parent is present.
+	 * @param parent the fin's parent component
+	 */
+	public Double getParentFrontRadius(RocketComponent parent) {
+		if (parent instanceof SymmetricComponent) {
+			final Coordinate finFront = this.getFinFront();
+
 			// pulls the parent-body radius at the fin-tab reference point.
 			final double xLead = this.getTabFrontEdge();
-			final double xTrail = this.getTabTrailingEdge();
-			
-			final SymmetricComponent sym = (SymmetricComponent)this.parent;
-			final double bodyRadius = MathUtil.min(sym.getRadius( xLead), sym.getRadius( xTrail));
-			
-			// limit the new heights to be no greater than the current body radius.
-			this.tabHeight = Math.min( this.tabHeight,  bodyRadius );
+
+			final SymmetricComponent sym = (SymmetricComponent) parent;
+			return sym.getRadius(finFront.x + xLead);
 		}
+		return null;
+	}
+
+	/**
+	 * Returns the radius of the parent at the front of the fin, or null if no parent is present.
+	 */
+	public Double getParentFrontRadius() {
+		return getParentFrontRadius(getParent());
+	}
+
+	/**
+	 * Returns the radius of the parent at the trailing edge of the fin, or null if no parent is present.
+	 * @param parent the fin's parent component
+	 */
+	public Double getParentTrailingRadius(RocketComponent parent) {
+		if (parent instanceof SymmetricComponent) {
+			final Coordinate finFront = this.getFinFront();
+
+			// pulls the parent-body radius at the fin-tab reference point.
+			final double xTrail = this.getTabTrailingEdge();
+
+			final SymmetricComponent sym = (SymmetricComponent) parent;
+			return sym.getRadius(finFront.x + xTrail);
+		}
+		return null;
+	}
+
+	/**
+	 * Returns the radius of the parent at the trailing edge of the fin, or null if no parent is present.
+	 */
+	public Double getParentTrailingRadius() {
+		return getParentTrailingRadius(getParent());
 	}
 	
 	///////////  Calculation methods  //////////
@@ -524,7 +648,7 @@ public abstract class FinSet extends ExternalComponent implements AxialPositiona
 
 			// calculate marginal area
 			final double delta_x = (cur.x - prev.x);
-			final double y_avg = (cur.y + prev.y)*0.5;
+			final double y_avg = (cur.y + prev.y)*0.5;	// TODO: MEDIUM: what if one of the points is below the x-axis? (can produce negative area)
 			double area_increment = delta_x*y_avg;
 			if( MathUtil.equals( 0, area_increment)){
 				prev = cur;
@@ -541,6 +665,11 @@ public abstract class FinSet extends ExternalComponent implements AxialPositiona
 			centroidSum = centroidSum.average( centroid_increment );
 
             prev=cur;
+		}
+
+		// Negative weight => make positive. TODO: This is NOT a correct solution, but at least it won't throw an exception...
+		if (centroidSum.weight < 0) {
+			centroidSum = new Coordinate(centroidSum.x, -centroidSum.y, centroidSum.z, Math.abs(centroidSum.weight));
 		}
 		
 		return centroidSum;
@@ -793,6 +922,7 @@ public abstract class FinSet extends ExternalComponent implements AxialPositiona
 			this.totalVolume = Double.NaN;
 			this.cantRotation = null;
 		}
+		
 		super.componentChanged(e);
 	}
 	
@@ -806,6 +936,17 @@ public abstract class FinSet extends ExternalComponent implements AxialPositiona
 	 */
 	public double getBodyRadius() {
 		return getFinFront().y;
+	}
+
+	public Coordinate getFinFront() {
+		final double xFinFront = this.getAxialFront();
+		final SymmetricComponent symmetricParent = (SymmetricComponent)this.getParent();
+		if( null == symmetricParent){
+			return new Coordinate( 0, 0);
+		}else{
+			final double yFinFront = symmetricParent.getRadius( xFinFront );
+			return new Coordinate(xFinFront, yFinFront);
+		}
 	}
 	
 	@Override
@@ -822,16 +963,6 @@ public abstract class FinSet extends ExternalComponent implements AxialPositiona
 	public boolean isCompatible(Class<? extends RocketComponent> type) {
 		return false;
 	}
-
-	/**
-	 * Return a list of coordinates defining the geometry of a single fin.  
-	 * The coordinates are the XY-coordinates of points defining the shape of a single fin,
-	 * where the origin is the leading root edge.  Therefore, the first point must be (0,0,0).
-	 * All Z-coordinates must be zero.
-	 * 
-	 * @return  List of XY-coordinates.
-	 */
-	public abstract Coordinate[] getFinPoints();
 	
 	public boolean isTabTrivial(){
 		return ( FinSet.minimumTabArea > (getTabLength()*getTabHeight()));
@@ -839,11 +970,7 @@ public abstract class FinSet extends ExternalComponent implements AxialPositiona
 		
 	public boolean isRootStraight( ){
         if( getParent() instanceof Transition){
-            if( ((Transition)getParent()).getType() == Transition.Shape.CONICAL ){
-                return true;
-            }else{
-                return false;
-            }
+			return ((Transition) getParent()).getType() == Shape.CONICAL;
         }
         
         // by default, assume a flat base
@@ -882,6 +1009,152 @@ public abstract class FinSet extends ExternalComponent implements AxialPositiona
 	}
 
 	/**
+	 * Return a list of coordinates defining the geometry of a single fin.
+	 * The coordinates are the XY-coordinates of points defining the shape of a single fin,
+	 * where the origin is the leading root edge.  Therefore, the first point must be (0,0,0).
+	 * All Z-coordinates must be zero.
+	 *
+	 * @return  List of XY-coordinates.
+	 */
+	public abstract Coordinate[] getFinPoints();
+
+	/**
+	 * used to get body points for the profile design view
+	 *
+	 * @return points representing the fin-root points, relative to ( x: fin-front, y: centerline ) i.e. relto: fin Component reference point
+	 */
+	public Coordinate[] getRootPoints(final int maximumBodyDivisionCount) {
+		if( null == parent){
+			return new Coordinate[]{Coordinate.ZERO};
+		}
+
+		final Coordinate finLead = getFinFront();
+		final double xFinEnd = finLead.x + getLength();
+
+		return getMountPoints( finLead.x, xFinEnd, -finLead.x, -finLead.y, maximumBodyDivisionCount);
+	}
+
+	/**
+	 * used to get body points for the profile design view
+	 *
+	 * @return points representing the fin-root points, relative to ( x: fin-front, y: centerline ) i.e. relto: fin Component reference point
+	 */
+	public Coordinate[] getRootPoints(){
+		return getRootPoints(MAX_ROOT_DIVISIONS);
+	}
+
+	/**
+	 * use this for calculating physical properties, and routine drawing
+	 *
+	 * @return points representing the fin-root points, relative to ( x: fin-front, y: centerline ) i.e. relto: fin Component reference point
+	 */
+	public Coordinate[] getMountPoints() {
+		if( null == parent){
+			return null;
+		}
+
+		return getMountPoints(0., parent.getLength(), 0,0);
+	}
+
+	/**
+	 * used to get calculate body profile points:
+	 *
+	 * @param xStart - xStart, in Mount-frame
+	 * @param xEnd - xEnd, in Mount-frame
+	 * @param xOffset - x-Offset to apply to returned points
+	 * @param yOffset - y-Offset to apply to returned points
+	 *
+	 * @return points representing the mount's points
+	 */
+	private Coordinate[] getMountPoints(final double xStart, final double xEnd, final double xOffset, final double yOffset,
+										final int maximumBodyDivisionCount) {
+		if (parent == null) {
+			return new Coordinate[]{Coordinate.ZERO};
+		}
+
+		// for a simple body, one increment is perfectly accurate.
+		int divisionCount = 1;
+		final SymmetricComponent body = (SymmetricComponent) getParent();
+		final double intervalLength = xEnd - xStart;
+
+		// for anything more complicated, increase the count:
+		if ((body instanceof Transition) && (((Transition)body).getType() != Shape.CONICAL)) {
+			// the maximum precision to enforce when calculating the areas of fins (especially on curved parent bodies)
+			final double xWidth = 0.0025; // width (in meters) of each individual iteration
+			divisionCount = (int) Math.ceil(intervalLength / xWidth);
+
+			// When creating body curves, don't create more than this many divisions. -- only relevant on very large components
+			// a too high division count will cause the 3D render to have invisible faces because it can't deal with the geometry.
+			divisionCount = Math.min(maximumBodyDivisionCount, divisionCount);
+		}
+
+		// Recalculate the x step increment, now with the (rounded) division count.
+		double xIncrement = intervalLength / divisionCount;
+
+		// Create the points: step through the radius of the parent
+		double xCur = xStart;
+		List<Coordinate> points = new ArrayList<>();
+		for (int index = 0; index < divisionCount+1; index++) {
+			double yCur = body.getRadius(xCur);
+			points.add(new Coordinate(xCur, yCur));
+
+			xCur += xIncrement;
+		}
+
+		/*
+		If the front fin point is outside the parent's bounds, and the last point is still within the parent's bounds,
+		then we need to add an extra root point at the front of the parent. Same goes for the last point, but vice versa.
+		This ensures that fins are drawn correctly on transitions and nose cones (see GitHub issue #1021 for more info).
+		 */
+		// Front fin point is outside the parent's bounds and last point is still within the parent's bounds
+		if (xStart < 0 && xEnd > 0) {
+			points.add(1, new Coordinate(0, points.get(0).y));
+		}
+		// End fin point is outside the parent's bounds and first point is still within the parent's bounds
+		if (xEnd > parent.length && xStart < parent.length) {
+			final double x = parent.length;
+			final double y = points.get(points.size() - 1).y;
+			points.add(points.size() - 1, new Coordinate(x, y));
+		}
+
+		Coordinate[] rootPoints = points.toArray(new Coordinate[0]);
+
+		// correct last point, if beyond a rounding error from body's end.
+		final int lastIndex = rootPoints.length - 1;
+		if (Math.abs(rootPoints[lastIndex].x - body.getLength()) < MathUtil.EPSILON) {
+			rootPoints[lastIndex] = rootPoints[lastIndex].setX(body.getLength()).setY(body.getAftRadius());
+		}
+
+		// translate the points if needed
+		if ((Math.abs(xOffset) + Math.abs(yOffset)) > MathUtil.EPSILON) {
+			rootPoints = translatePoints(rootPoints, xOffset, yOffset);
+		}
+
+		return rootPoints;
+	}
+
+	private Coordinate[] getMountPoints(final double xStart, final double xEnd, final double xOffset, final double yOffset) {
+		return getMountPoints(xStart, xEnd, xOffset, yOffset, MAX_ROOT_DIVISIONS);
+	}
+
+	/**
+	 * Return a list of coordinates defining the geometry of a single fin, including the parent's body points .
+	 */
+	public Coordinate[] getFinPointsWithRoot() {
+		return combineCurves(getFinPoints(), getRootPoints());
+	}
+
+	/**
+	 * Return a list of coordinates defining the geometry of a single fin, including the parent's body points .
+	 *
+	 * This low res version is for 3D rendering, as a too high resolution would cause clipping and invisible fin faces.
+	 * This should at one point be solved by rendering the fin faces using triangulation, instead of how it's currently implemented.
+	 */
+	public Coordinate[] getFinPointsWithLowResRoot() {
+		return combineCurves(getFinPoints(), getRootPoints(MAX_ROOT_DIVISIONS_LOW_RES));
+	}
+
+	/**
 	 * Return a list of X,Y coordinates defining the geometry of a single fin tab. 
 	 * The origin is the leading root edge, and the tab height (or 'depth') is 
 	 * the radial distance inwards from the reference point, depending on positioning method: 
@@ -894,57 +1167,84 @@ public abstract class FinSet extends ExternalComponent implements AxialPositiona
 	 * @return  List of XY-coordinates.
 	 */
 	public Coordinate[] getTabPoints() {
-		
 		if (MathUtil.equals(getTabHeight(), 0) ||
 				MathUtil.equals(getTabLength(), 0)){
 			return new Coordinate[]{};
 		}
-	
-		final int pointCount = 4;
-		Coordinate[] points = new Coordinate[pointCount];
-		final Coordinate finFront = this.getFinFront();
-		
-		final SymmetricComponent body = (SymmetricComponent)this.getParent();
-		
+
 		final double xTabFront = getTabFrontEdge();
 		final double xTabTrail = getTabTrailingEdge();
+
+		List<Coordinate> rootPoints = new ArrayList<>();
+		for (Coordinate point : getRootPoints()) {
+			if (point.x > xTabFront && point.x < xTabTrail) {
+				rootPoints.add(point);
+			}
+		}
+
+		return generateTabPointsWithRoot(rootPoints);
+	}
+
+	/**
+	 * Return a list of X,Y coordinates defining the geometry of a single fin tab.
+	 * The origin is the leading root edge, and the tab height (or 'depth') is
+	 * the radial distance inwards from the reference point, depending on positioning method:
+	 *      if via TOP:    tab front edge
+	 *      if via MIDDLE: tab middle
+	 *      if via BOTTOM: tab trailing edge
+	 *
+	 * The tab coordinates will generally have negative y values.
+	 *
+	 * This low res version is for 3D rendering, as a too high resolution would cause clipping and invisible fin faces.
+	 * This should at one point be solved by rendering the fin faces using triangulation, instead of how it's currently implemented.
+	 *
+	 * @return  List of XY-coordinates.
+	 */
+	public Coordinate[] getTabPointsLowRes() {
+		if (MathUtil.equals(getTabHeight(), 0) ||
+				MathUtil.equals(getTabLength(), 0)){
+			return new Coordinate[]{};
+		}
+
+		final double xTabFront = getTabFrontEdge();
+		final double xTabTrail = getTabTrailingEdge();
+
+		List<Coordinate> rootPoints = new ArrayList<>();
+		for (Coordinate point : getRootPoints(MAX_ROOT_DIVISIONS_LOW_RES)) {
+			if (point.x > xTabFront && point.x < xTabTrail) {
+				rootPoints.add(point);
+			}
+		}
+
+		return generateTabPointsWithRoot(rootPoints);
+	}
+
+	private Coordinate[] generateTabPointsWithRoot(List<Coordinate> rootPoints) {
+		final double xTabFront = getTabFrontEdge();
+		final double xTabTrail = getTabTrailingEdge();
+
+		Coordinate[] tabPoints = new Coordinate[4];
+		final Coordinate finFront = this.getFinFront();
+
+		final SymmetricComponent body = (SymmetricComponent)this.getParent();
 
 		// // limit the new heights to be no greater than the current body radius.
 		double yTabFront = Double.NaN;
 		double yTabTrail = Double.NaN;
 		double yTabBottom = Double.NaN;
 		if( null != body ){
-			yTabFront = body.getRadius( finFront.x + xTabFront ) - finFront.y;
-			yTabTrail = body.getRadius( finFront.x + xTabTrail ) - finFront.y;
+			yTabFront = body.getRadius( finFront.x + xTabFront) - finFront.y;
+			yTabTrail = body.getRadius( finFront.x + xTabTrail) - finFront.y;
 			yTabBottom = MathUtil.min(yTabFront, yTabTrail) - tabHeight;
 		}
 
-		points[0] = new Coordinate(xTabFront, yTabFront);
-		points[1] = new Coordinate(xTabFront, yTabBottom );
-		points[2] = new Coordinate(xTabTrail, yTabBottom );
-		points[3] = new Coordinate(xTabTrail, yTabTrail);
+		tabPoints[0] = new Coordinate(xTabFront, yTabFront);
+		tabPoints[1] = new Coordinate(xTabFront, yTabBottom );
+		tabPoints[2] = new Coordinate(xTabTrail, yTabBottom );
+		tabPoints[3] = new Coordinate(xTabTrail, yTabTrail);
+		rootPoints.add(0, new Coordinate(xTabFront, yTabFront));
 
-		return points;
-	}
-
-	public Coordinate getFinFront() {
-		final double xFinFront = this.getAxialFront();
-		final SymmetricComponent symmetricParent = (SymmetricComponent)this.getParent();
-		if( null == symmetricParent){
-			return new Coordinate( 0, 0);
-		}else{
-			final double yFinFront = symmetricParent.getRadius( xFinFront );
-			return new Coordinate(xFinFront, yFinFront);
-		}
-	}
-
-
-	/* 
-	 * yes, this may over-count points between the fin and fin tabs, 
-	 * but the minor performance hit is not worth the code complexity of dealing with.
-	 */
-	public Coordinate[] getFinPointsWithTab() {
-		return combineCurves(getFinPoints(), getTabPoints());
+		return combineCurves(tabPoints, rootPoints.toArray(new Coordinate[0]));
 	}
 	
 	@Override
@@ -954,6 +1254,12 @@ public abstract class FinSet extends ExternalComponent implements AxialPositiona
 
 	@Override
 	public void setAngleOffset(final double angleRadians) {
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof FinSet) {
+				((FinSet) listener).setAngleOffset(angleRadians);
+			}
+		}
+
 		final double reducedAngle = MathUtil.reducePi(angleRadians);
 		if (MathUtil.equals(reducedAngle, firstFinOffsetRadians))
 			return;
@@ -992,6 +1298,12 @@ public abstract class FinSet extends ExternalComponent implements AxialPositiona
 
 	@Override
 	public void setAngleMethod(AngleMethod newAngleMethod ) {
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof FinSet) {
+				((FinSet) listener).setAngleMethod(newAngleMethod);
+			}
+		}
+
 		mutex.verify();
 		this.angleMethod = newAngleMethod;
 		fireComponentChangeEvent(ComponentChangeEvent.BOTH_CHANGE);
@@ -1020,6 +1332,12 @@ public abstract class FinSet extends ExternalComponent implements AxialPositiona
 
 	@Override
 	public void setInstanceCount(int newCount) {
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof FinSet) {
+				((FinSet) listener).setInstanceCount(newCount);
+			}
+		}
+
 		setFinCount(newCount);
 	}
 
@@ -1067,6 +1385,12 @@ public abstract class FinSet extends ExternalComponent implements AxialPositiona
 	}
 	
 	public void setFilletMaterial(Material mat) {
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof FinSet) {
+				((FinSet) listener).setFilletMaterial(mat);
+			}
+		}
+
 		if (mat.getType() != Material.Type.BULK) {
 			throw new IllegalArgumentException("ExternalComponent requires a bulk material" +
 					" type=" + mat.getType());
@@ -1084,96 +1408,17 @@ public abstract class FinSet extends ExternalComponent implements AxialPositiona
 	}
 	
 	public void setFilletRadius(double r) {
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof FinSet) {
+				((FinSet) listener).setFilletRadius(r);
+			}
+		}
+
 		if (MathUtil.equals(filletRadius, r))
 			return;
 		filletRadius = r;
 		clearPreset();
 		fireComponentChangeEvent(ComponentChangeEvent.MASS_CHANGE);
-	}
-
-	/**
-	 * use this for calculating physical properties, and routine drawing
-	 *
-	 * @return points representing the fin-root points, relative to ( x: fin-front, y: centerline ) i.e. relto: fin Component reference point
-	 */
-	public Coordinate[] getMountPoints() {
-		if( null == parent){
-			return null;
-		}
-
-		return getMountPoints(0., parent.getLength(), 0,0);
-	}
-
-	/**
-	 * used to get body points for the profile design view
-	 * 
-	 * @return points representing the fin-root points, relative to ( x: fin-front, y: centerline ) i.e. relto: fin Component reference point
-	 */
-	public Coordinate[] getRootPoints(){
-		if( null == parent){
-			return new Coordinate[]{Coordinate.ZERO};
-		}
-		
-		final Coordinate finLead = getFinFront();
-		final double xFinEnd = finLead.x + getLength();
-
-		return getMountPoints( finLead.x, xFinEnd, -finLead.x, -finLead.y);
-	}
-
-	/**
-	 * used to get calculate body profile points:
-	 *
-	 * @param xStart - xStart, in Mount-frame
-	 * @param xEnd - xEnd, in Mount-frame
-	 * @param xOffset - x-Offset to apply to returned points
-	 * @param yOffset - y-Offset to apply to returned points
-	 *
-	 * @return points representing the mount's points
-	 */
-	private Coordinate[] getMountPoints(final double xStart, final double xEnd, final double xOffset, final double yOffset) {
-		if( null == parent){
-			return new Coordinate[]{Coordinate.ZERO};
-		}
-
-		// for a simple bodies, one increment is perfectly accurate.
-		int divisionCount = 1;
-		// cast-assert
-		final SymmetricComponent body = (SymmetricComponent) getParent();
-
-		// for anything more complicated, increase the count: 
-		if( ( body instanceof Transition) && ( ((Transition)body).getType() != Shape.CONICAL )){
-			// the maximum precision to enforce when calculating the areas of fins ( especially on curved parent bodies)
-			final double xWidth = 0.005; // width of each individual iteration
-			divisionCount = (int)Math.ceil(  (xEnd - xStart) / xWidth );
-			
-			// When creating body curves, don't create more than this many divisions. -- only relevant on very large components
-			final int maximumBodyDivisionCount = 100;
-			divisionCount = Math.min( maximumBodyDivisionCount, divisionCount);
-		}
-		
-		final double intervalLength = xEnd - xStart;
-		double increment = (intervalLength)/divisionCount;
-				
-		double xCur = xStart;
-		Coordinate[] points = new Coordinate[divisionCount+1];
-		for( int index = 0; index < points.length; index++){
-			double yCur = body.getRadius( xCur );
-			points[index]=new Coordinate( xCur, yCur);
-			
-			xCur += increment;
-		}
-
-		// correct last point, if beyond a rounding error from body's end.
-		final int lastIndex = points.length - 1;
-		if( body.getLength()-0.000001 < points[lastIndex].x) {
-			points[lastIndex] = points[lastIndex].setX(body.getLength()).setY(body.getAftRadius());
-		}
-
-		if( 0.0000001 < (Math.abs(xOffset) + Math.abs(yOffset))){
-			points = translatePoints(points, xOffset, yOffset);
-		}
-
-		return points;
 	}
 
 	// for debugging.  You can safely delete this method
@@ -1268,5 +1513,15 @@ public abstract class FinSet extends ExternalComponent implements AxialPositiona
 		}
 		
 		return toReturn;
+	}
+
+	@Override
+	public InsideColorComponentHandler getInsideColorComponentHandler() {
+		return this.insideColorComponentHandler;
+	}
+
+	@Override
+	public void setInsideColorComponentHandler(InsideColorComponentHandler handler) {
+		this.insideColorComponentHandler = handler;
 	}
 }

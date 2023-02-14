@@ -78,12 +78,20 @@ public class ClassBasedTranslator implements Translator {
 	public String getBaseText(String base, String translation) {
 		return translator.getBaseText(base, translation);
 	}
-	
-	
+
+	@Override
+	public boolean checkIfKeyExists(String key) {
+		try {
+			get(key);
+			return true;
+		} catch (MissingResourceException e) {
+			return false;
+		}
+	}
 	
 	private String findClassName() {
 		Throwable trace = new Throwable();
-		StackTraceElement stack[] = trace.getStackTrace();
+		StackTraceElement[] stack = trace.getStackTrace();
 		final int index = 2 + levels;
 		if (stack.length <= index) {
 			throw new BugException("Stack trace is too short, length=" + stack.length + ", expected=" + index, trace);

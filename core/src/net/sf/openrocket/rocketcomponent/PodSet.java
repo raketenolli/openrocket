@@ -1,17 +1,14 @@
 package net.sf.openrocket.rocketcomponent;
 
-import java.util.ArrayList;
-import java.util.Collection;
 
-import jdk.jshell.spi.ExecutionControl;
 import net.sf.openrocket.l10n.Translator;
 import net.sf.openrocket.rocketcomponent.position.AngleMethod;
 import net.sf.openrocket.rocketcomponent.position.AxialMethod;
 import net.sf.openrocket.rocketcomponent.position.RadiusMethod;
 import net.sf.openrocket.startup.Application;
-import net.sf.openrocket.util.BoundingBox;
 import net.sf.openrocket.util.BugException;
 import net.sf.openrocket.util.Coordinate;
+import net.sf.openrocket.util.MathUtil;
 
 public class PodSet extends ComponentAssembly implements RingInstanceable {
 	
@@ -26,7 +23,7 @@ public class PodSet extends ComponentAssembly implements RingInstanceable {
 	protected double angleSeparation = Math.PI;
 	// angle to the first pod
 	protected double angleOffset_rad = 0;
-	 
+
 	protected RadiusMethod radiusMethod = RadiusMethod.RELATIVE;
 	protected double radiusOffset_m = 0;
 	
@@ -124,19 +121,23 @@ public class PodSet extends ComponentAssembly implements RingInstanceable {
 	
 	@Override
 	public double getAxialOffset() {
-		double returnValue = Double.NaN;
-		
+		return getAxialOffset(this.axialMethod);
+	}
+	@Override
+	public double getAxialOffset(AxialMethod method) {
+		double returnValue;
+
 		if (this.isAfter()){
 			// remember the implicit (this instanceof Stage)
 			throw new BugException("found a pod positioned via: AFTER, but is not on the centerline?!: " + this.getName() + "  is " + this.getAxialMethod().name() );
 		} else {
-			returnValue = super.getAxialOffset(this.axialMethod);
+			returnValue = super.getAxialOffset(method);
 		}
-		
-		if (0.000001 > Math.abs(returnValue)) {
+
+		if (MathUtil.EPSILON > Math.abs(returnValue)) {
 			returnValue = 0.0;
 		}
-		
+
 		return returnValue;
 	}
 
@@ -162,7 +163,13 @@ public class PodSet extends ComponentAssembly implements RingInstanceable {
 	
 	
 	@Override 
-	public void setInstanceCount( final int newCount ){
+	public void setInstanceCount(int newCount ){
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof PodSet) {
+				((PodSet) listener).setInstanceCount(newCount);
+			}
+		}
+
 		mutex.verify();
 		if ( newCount < 1) {
 			// there must be at least one instance....   
@@ -183,16 +190,22 @@ public class PodSet extends ComponentAssembly implements RingInstanceable {
 		//			Stage refStage = (Stage) this.parent;
 		//			System.err.println("      >>refStageName: " + refStage.getName() + "\n");
 		//			System.err.println("      ..refCenterX: " + refStage.position.x + "\n");
-		//			System.err.println("      ..refLength: " + refStage.getLength() + "\n");
+		//			System.err.println("      ..refLength: " + refStage.getLengthAerodynamic() + "\n");
 		//		}
 		return buf;
 	}
 
 	@Override
 	public void setAngleOffset(double angle_rad) {
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof PodSet) {
+				((PodSet) listener).setAngleOffset(angle_rad);
+			}
+		}
+
 		mutex.verify();
 		this.angleOffset_rad = angle_rad;
-		fireComponentChangeEvent(ComponentChangeEvent.BOTH_CHANGE);		
+		fireComponentChangeEvent(ComponentChangeEvent.BOTH_CHANGE);
 	}
 
 	@Override
@@ -206,40 +219,62 @@ public class PodSet extends ComponentAssembly implements RingInstanceable {
 
 	@Override
 	public void setRadiusOffset(double radius_m) {
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof PodSet) {
+				((PodSet) listener).setRadiusOffset(radius_m);
+			}
+		}
+
 		mutex.verify();
-		if( this.radiusMethod.clampToZero() ) {
+
+		if (radius_m == this.radiusOffset_m) return;
+
+		if (this.radiusMethod.clampToZero()) {
 			this.radiusOffset_m = 0.0;
-		}else {
+		} else {
 			this.radiusOffset_m = radius_m;
 		}
 		fireComponentChangeEvent(ComponentChangeEvent.BOTH_CHANGE);
 	}
-	
+
 	@Override
 	public RadiusMethod getRadiusMethod() {
 		return this.radiusMethod;
 	}
-	
+
 	@Override
-	public void setRadiusMethod( final RadiusMethod newMethod ) {
+	public void setRadiusMethod(RadiusMethod newMethod ) {
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof PodSet) {
+				((PodSet) listener).setRadiusMethod(newMethod);
+			}
+		}
+
+		if (newMethod == this.radiusMethod) return;
+
 		mutex.verify();
-		this.radiusMethod = newMethod;
-		fireComponentChangeEvent(ComponentChangeEvent.BOTH_CHANGE);
+		double radius = this.radiusMethod.getRadius(getParent(), this, this.radiusOffset_m);	// Radius from the parent's center
+		setRadius(newMethod, radius);
 	}
-	
+
 	@Override
-	public void setRadius( final RadiusMethod requestMethod, final double requestRadius ) {
+	public void setRadius(RadiusMethod requestMethod, double requestRadius ) {
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof PodSet) {
+				((PodSet) listener).setRadius(requestMethod, requestRadius);
+			}
+		}
+
 		mutex.verify();
-		
-		RadiusMethod newMethod = requestMethod; 
+
 		double newRadius = requestRadius;
-		
+
 		if( this.radiusMethod.clampToZero() ) {
 			newRadius = 0.;
 		}
-		
-		this.radiusMethod = newMethod;
-		this.radiusOffset_m = newRadius;
+
+		this.radiusMethod = requestMethod;
+		this.radiusOffset_m =  this.radiusMethod.getAsOffset(getParent(), this, newRadius);
 		fireComponentChangeEvent(ComponentChangeEvent.BOTH_CHANGE);
 	}
 

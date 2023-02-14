@@ -23,7 +23,7 @@ public class MassCalculator implements Monitorable {
 	//	private MassData rocketSpentMassCache;
 	//	private MassData motorMassCache;
 
-	private int modId = 0;
+	private final int modId = 0;
 	
 	//////////////////  Constructors ///////////////////
 	public MassCalculator() {
@@ -104,7 +104,7 @@ public class MassCalculator implements Monitorable {
 	public static RigidBody calculate( final MassCalculation.Type _type, final SimulationStatus status ){
 		final FlightConfiguration config = status.getConfiguration();
 		final double time = status.getSimulationTime();
-		final Collection<MotorClusterState> activeMotorList = status.getMotors();
+		final Collection<MotorClusterState> activeMotorList = status.getActiveMotors();
 		MassCalculation calculation= new MassCalculation( _type, config, time, activeMotorList, config.getRocket(), Transformation.IDENTITY, null);
 		
 		calculation.calculateAssembly();

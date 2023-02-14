@@ -4,8 +4,12 @@ import java.awt.GraphicsEnvironment;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.File;
+import java.io.IOException;
 import java.io.PrintStream;
+import java.util.Arrays;
+import java.util.stream.IntStream;
 
+import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 import javax.swing.ToolTipManager;
@@ -15,10 +19,12 @@ import net.sf.openrocket.arch.SystemInfo;
 import net.sf.openrocket.arch.SystemInfo.Platform;
 import net.sf.openrocket.communication.UpdateInfo;
 import net.sf.openrocket.communication.UpdateInfoRetriever;
+import net.sf.openrocket.communication.UpdateInfoRetriever.ReleaseStatus;
+import net.sf.openrocket.communication.WelcomeInfoRetriever;
 import net.sf.openrocket.database.Databases;
 import net.sf.openrocket.gui.dialogs.UpdateInfoDialog;
+import net.sf.openrocket.gui.dialogs.WelcomeDialog;
 import net.sf.openrocket.gui.main.BasicFrame;
-import net.sf.openrocket.gui.main.MRUDesignFile;
 import net.sf.openrocket.gui.main.Splash;
 import net.sf.openrocket.gui.main.SwingExceptionHandler;
 import net.sf.openrocket.gui.util.GUIUtil;
@@ -48,7 +54,7 @@ public class SwingStartup {
 	 * OpenRocket startup main method.
 	 */
 	public static void main(final String[] args) throws Exception {
-		
+
 		// Check for "openrocket.debug" property before anything else
 		checkDebugStatus();
 
@@ -59,6 +65,11 @@ public class SwingStartup {
 		// Initialize logging first so we can use it
 		initializeLogging();
 		log.info("Starting up OpenRocket version {}", BuildProperties.getVersion());
+
+		// Check JRE version
+		if (!checkJREVersion()) {
+			return;
+		}
 		
 		// Check that we're not running headless
 		log.info("Checking for graphics head");
@@ -83,7 +94,45 @@ public class SwingStartup {
 		log.info("Startup complete");
 		
 	}
-	
+
+	/**
+	 * Checks whether the Java Runtime Engine version is supported.
+	 *
+	 * @return true if the JRE is supported, false if not
+	 */
+	private static boolean checkJREVersion() {
+		String JREVersion = System.getProperty("java.version");
+		if (JREVersion != null) {
+			try {
+				// We're only interested in the big decimal part of the JRE version
+				int version = Integer.parseInt(JREVersion.split("\\.")[0]);
+				if (IntStream.of(Application.SUPPORTED_JRE_VERSIONS).noneMatch(c -> c == version)) {
+					String title = "Unsupported Java version";
+					String message1 = "Unsupported Java version: %s";
+					String message2 = "Supported version(s): %s";
+					String message3 = "Please change the Java Runtime Environment version or install OpenRocket using a packaged installer.";
+
+					StringBuilder message = new StringBuilder();
+					message.append(String.format(message1, JREVersion));
+					message.append("\n");
+					String[] supported = Arrays.stream(Application.SUPPORTED_JRE_VERSIONS)
+							.mapToObj(String::valueOf)
+							.toArray(String[]::new);
+					message.append(String.format(message2, String.join(", ", supported)));
+					message.append("\n\n");
+					message.append(message3);
+
+					JOptionPane.showMessageDialog(null, message.toString(),
+							title, JOptionPane.ERROR_MESSAGE);
+					return false;
+				}
+			} catch (NumberFormatException e) {
+				log.warn("Malformed JRE version - " + JREVersion);
+			}
+		}
+		return true;
+	}
+
 	/**
 	 * Set proper system properties if openrocket.debug is defined.
 	 */
@@ -146,15 +195,7 @@ public class SwingStartup {
 		guiModule.startLoader();
 		
 		// Start update info fetching
-		final UpdateInfoRetriever updateInfo;
-		if (Application.getPreferences().getCheckUpdates()) {
-			log.info("Starting update check");
-			updateInfo = new UpdateInfoRetriever();
-			updateInfo.start();
-		} else {
-			log.info("Update check disabled");
-			updateInfo = null;
-		}
+		final UpdateInfoRetriever updateRetriever = startUpdateChecker();
 		
 		// Set the best available look-and-feel
 		log.info("Setting best LAF");
@@ -167,32 +208,23 @@ public class SwingStartup {
 		((SwingPreferences) Application.getPreferences()).loadDefaultUnits();
 		
 		Databases.fakeMethod();
+
+		// Set up the OSX file open handler here so that it can handle files that are opened when OR is not yet running.
+		if (SystemInfo.getPlatform() == Platform.MAC_OS) {
+			OSXSetup.setupOSXOpenFileHandler();
+		}
 		
 		// Starting action (load files or open new document)
 		log.info("Opening main application window");
 		if (!handleCommandLine(args)) {
-			if (!Application.getPreferences().isAutoOpenLastDesignOnStartupEnabled()) {
-				BasicFrame.newAction();
-			} else {
-				String lastFile = MRUDesignFile.getInstance().getLastEditedDesignFile();
-				if (lastFile != null) {
-					if (!BasicFrame.open(new File(lastFile), null)) {
-						MRUDesignFile.getInstance().removeFile(lastFile);
-						BasicFrame.newAction();
-					}
-					else {
-						MRUDesignFile.getInstance().addFile(lastFile);
-					}
-				}
-				else {
-					BasicFrame.newAction();
-				}
-			}
+			BasicFrame startupFrame = BasicFrame.reopen();
+			BasicFrame.setStartupFrame(startupFrame);
+			showWelcomeDialog();
 		}
 		
 		// Check whether update info has been fetched or whether it needs more time
 		log.info("Checking update status");
-		checkUpdateStatus(updateInfo);
+		checkUpdateStatus(updateRetriever);
 		
 	}
 	
@@ -211,14 +243,26 @@ public class SwingStartup {
 		}
 		
 	}
+
+	public static UpdateInfoRetriever startUpdateChecker() {
+		final UpdateInfoRetriever updateRetriever;
+		if (Application.getPreferences().getCheckUpdates()) {
+			log.info("Starting update check");
+			updateRetriever = new UpdateInfoRetriever();
+			updateRetriever.startFetchUpdateInfo();
+		} else {
+			log.info("Update check disabled");
+			updateRetriever = null;
+		}
+		return updateRetriever;
+	}
 	
-	
-	private void checkUpdateStatus(final UpdateInfoRetriever updateInfo) {
-		if (updateInfo == null)
+	public static void checkUpdateStatus(final UpdateInfoRetriever updateRetriever) {
+		if (updateRetriever == null)
 			return;
 		
 		int delay = 1000;
-		if (!updateInfo.isRunning())
+		if (!updateRetriever.isRunning())
 			delay = 100;
 		
 		final Timer timer = new Timer(delay, null);
@@ -228,24 +272,17 @@ public class SwingStartup {
 			
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				if (!updateInfo.isRunning()) {
+				if (!updateRetriever.isRunning()) {
 					timer.stop();
-					
-					String current = BuildProperties.getVersion();
-					String last = Application.getPreferences().getString(Preferences.LAST_UPDATE, "");
-					
-					UpdateInfo info = updateInfo.getUpdateInfo();
-					if (info != null && info.getLatestVersion() != null &&
-							!current.equals(info.getLatestVersion()) &&
-							!last.equals(info.getLatestVersion())) {
-						
+
+					final SwingPreferences preferences = (SwingPreferences) Application.getPreferences();
+					UpdateInfo info = updateRetriever.getUpdateInfo();
+
+					// Only display something when an update is found
+					if (info != null && info.getException() == null && info.getReleaseStatus() == ReleaseStatus.OLDER &&
+						!preferences.getIgnoreUpdateVersions().contains(info.getLatestRelease().getReleaseName())) {
 						UpdateInfoDialog infoDialog = new UpdateInfoDialog(info);
 						infoDialog.setVisible(true);
-						if (infoDialog.isReminderSelected()) {
-							Application.getPreferences().putString(Preferences.LAST_UPDATE, "");
-						} else {
-							Application.getPreferences().putString(Preferences.LAST_UPDATE, info.getLatestVersion());
-						}
 					}
 				}
 				count--;
@@ -255,6 +292,34 @@ public class SwingStartup {
 		};
 		timer.addActionListener(listener);
 		timer.start();
+	}
+
+	/**
+	 * Shows a welcome dialog displaying the release notes for this build version.
+	 */
+	public static void showWelcomeDialog() {
+		// Don't show if this build version is ignored
+		if (Application.getPreferences().getIgnoreWelcome(BuildProperties.getVersion())) {
+			log.debug("Welcome dialog ignored");
+			return;
+		}
+
+		// Fetch this version's release notes
+		String releaseNotes;
+		try {
+			releaseNotes = WelcomeInfoRetriever.retrieveWelcomeInfo();
+		} catch (IOException e) {
+			log.error("Error retrieving welcome info", e);
+			return;
+		}
+		if (releaseNotes == null) {
+			log.debug("No release notes found");
+			return;
+		}
+
+		// Show the dialog
+		WelcomeDialog dialog = new WelcomeDialog(releaseNotes);
+		dialog.setVisible(true);
 	}
 	
 	/**
@@ -271,7 +336,7 @@ public class SwingStartup {
 		// Check command-line for files
 		boolean opened = false;
 		for (String file : args) {
-			if (BasicFrame.open(new File(file), null)) {
+			if (BasicFrame.open(new File(file), null) != null) {
 				opened = true;
 			}
 		}

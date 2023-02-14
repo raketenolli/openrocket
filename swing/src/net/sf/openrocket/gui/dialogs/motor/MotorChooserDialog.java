@@ -6,6 +6,8 @@ import java.awt.Window;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 
+import javax.swing.AbstractAction;
+import javax.swing.Action;
 import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JDialog;
@@ -73,7 +75,13 @@ public class MotorChooserDialog extends JDialog implements CloseableDialog {
 		this.setModal(true);
 		this.pack();
 		this.setLocationByPlatform(true);
-		GUIUtil.installEscapeCloseOperation(this);
+		Action closeAction = new AbstractAction() {
+			@Override
+			public void actionPerformed(ActionEvent event) {
+				close(false);
+			}
+		};
+		GUIUtil.installEscapeCloseOperation(this, closeAction);
 		
 		JComponent focus = selectionPanel.getDefaultFocus();
 		if (focus != null) {
@@ -82,6 +90,8 @@ public class MotorChooserDialog extends JDialog implements CloseableDialog {
 		
 		// Set the closeable dialog after all initialization
 		selectionPanel.setCloseableDialog(this);
+
+		GUIUtil.setWindowIcons(this);
 	}
 	
 	public void setMotorMountAndConfig( FlightConfigurationId _fcid, MotorMount _mount ) {
@@ -107,9 +117,13 @@ public class MotorChooserDialog extends JDialog implements CloseableDialog {
 	public double getSelectedDelay() {
 		return selectionPanel.getSelectedDelay();
 	}
-	
-	
-	
+
+	public void open() {
+		// Update the motor selection based on the motor table value that was already selected in a previous session.
+		selectionPanel.selectMotorFromTable();
+		setVisible(true);
+	}
+
 	@Override
 	public void close(boolean ok) {
 		okClicked = ok;

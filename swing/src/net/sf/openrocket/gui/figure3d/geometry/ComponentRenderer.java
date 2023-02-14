@@ -7,6 +7,7 @@ import com.jogamp.opengl.fixedfunc.GLMatrixFunc;
 import com.jogamp.opengl.glu.GLU;
 import com.jogamp.opengl.glu.GLUquadric;
 
+import net.sf.openrocket.rocketcomponent.InnerTube;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,6 +28,8 @@ import net.sf.openrocket.rocketcomponent.Transition.Shape;
 import net.sf.openrocket.rocketcomponent.TubeFinSet;
 import net.sf.openrocket.util.Coordinate;
 import net.sf.openrocket.util.Transformation;
+
+import static com.jogamp.opengl.GL2ES3.GL_QUADS;
 
 /*
  * @author Bill Kuker <bkuker@billkuker.com>
@@ -98,6 +101,8 @@ public class ComponentRenderer {
 
 		if (c instanceof BodyTube) {
 			renderTube(gl, (BodyTube) c, which);
+		} else if (c instanceof InnerTube) {
+			renderTube(gl, (InnerTube) c, which);
 		} else if (c instanceof LaunchLug) {
 			renderLug(gl, (LaunchLug) c, which);
 		} else if ( c instanceof RailButton ){
@@ -112,9 +117,7 @@ public class ComponentRenderer {
 				renderMassObject(gl, (MassObject) c);
 		} else if (c instanceof FinSet) {
 		    FinSet fins = (FinSet) c;
-			if (which == Surface.OUTSIDE) {
-			    fr.renderFinSet(gl, fins);
-			}
+			fr.renderFinSet(gl, fins, which);
 		} else if (c instanceof TubeFinSet) {
 			renderTubeFins( gl, (TubeFinSet) c, which);
 		} else if ( c instanceof AxialStage ) {
@@ -205,7 +208,7 @@ public class ComponentRenderer {
 			if (t.getForeShoulderLength() > 0) {
 				gl.glPushMatrix();
 				gl.glRotated(180, 0, 1.0, 0);
-				//gl.glTranslated(t.getLength(), 0, 0);
+				//gl.glTranslated(t.getLengthAerodynamic(), 0, 0);
 				double iR = (t.isFilled() || t.isForeShoulderCapped()) ? 0 : t.getForeShoulderRadius() - t.getForeShoulderThickness();
 				if (which == Surface.EDGES) {
 					renderTube(gl, Surface.OUTSIDE, t.getForeShoulderRadius(), iR, t.getForeShoulderLength());
@@ -259,6 +262,10 @@ public class ComponentRenderer {
 		renderTube(gl, which, t.getOuterRadius(), t.getInnerRadius(), t.getLength());
 	}
 
+	private void renderTube(GL2 gl, InnerTube t, Surface which) {
+		renderTube(gl, which, t.getOuterRadius(), t.getInnerRadius(), t.getLength());
+	}
+
 	private void renderRing(GL2 gl, RingComponent r) {
 
 		gl.glRotated(90, 0, 1.0, 0);
@@ -290,26 +297,50 @@ public class ComponentRenderer {
 			final double ir = r.getInnerDiameter() / 2.0;
 			gl.glRotated(r.getAngleOffset()*180/Math.PI -90 , 1, 0, 0);
 			
-			//Inner Diameter
-			glu.gluCylinder(q, ir, ir, r.getTotalHeight(), LOD, 1);
+			// Base Cylinder
+			if (r.getBaseHeight() > 0) {
+				glu.gluCylinder(q, or, or, r.getBaseHeight(), LOD, 1);
+				glu.gluQuadricOrientation(q, GLU.GLU_INSIDE);
+				glu.gluDisk(q, 0, or, LOD, 2);
+				glu.gluQuadricOrientation(q, GLU.GLU_OUTSIDE);
+				gl.glTranslated(0, 0, r.getBaseHeight());
+				glu.gluDisk(q, 0, or, LOD, 2);
+			} else {	// Draw a closing cap if there is no base
+				glu.gluQuadricOrientation(q, GLU.GLU_INSIDE);
+				glu.gluDisk(q, 0, ir, LOD, 2);
+				glu.gluQuadricOrientation(q, GLU.GLU_OUTSIDE);
+				gl.glTranslated(0, 0, r.getBaseHeight());
+			}
+
+			// Inner Cylinder
+			glu.gluCylinder(q, ir, ir, r.getInnerHeight(), LOD, 1);
 			
-			//Bottom Disc
-			glu.gluCylinder(q, or, or, r.getBaseHeight(), LOD, 1);
-			glu.gluQuadricOrientation(q, GLU.GLU_INSIDE);
-			glu.gluDisk(q, 0, or, LOD, 2);
-			glu.gluQuadricOrientation(q, GLU.GLU_OUTSIDE);
-			gl.glTranslated(0,0,r.getBaseHeight());
-			glu.gluDisk(q, 0, or, LOD, 2);
-			
-			
-			//Upper Disc
-			gl.glTranslated(0,0,r.getTotalHeight() - r.getFlangeHeight() * 2.0);
-			glu.gluCylinder(q, or, or, r.getFlangeHeight(), LOD, 1);
-			glu.gluQuadricOrientation(q, GLU.GLU_INSIDE);
-			glu.gluDisk(q, 0, or, LOD, 2);
-			glu.gluQuadricOrientation(q, GLU.GLU_OUTSIDE);
-			gl.glTranslated(0,0,r.getFlangeHeight());
-			glu.gluDisk(q, 0, or, LOD, 2);
+			// Flange Cylinder
+			gl.glTranslated(0, 0, r.getInnerHeight());
+			if (r.getFlangeHeight() > 0) {
+				glu.gluCylinder(q, or, or, r.getFlangeHeight(), LOD, 1);
+				glu.gluQuadricOrientation(q, GLU.GLU_INSIDE);
+				glu.gluDisk(q, 0, or, LOD, 2);
+				glu.gluQuadricOrientation(q, GLU.GLU_OUTSIDE);
+				gl.glTranslated(0, 0, r.getFlangeHeight());
+				glu.gluDisk(q, 0, or, LOD, 2);
+			} else if (r.getScrewHeight() == 0) {	// Draw a closing cap if there is no flange
+				glu.gluDisk(q, 0, ir, LOD, 2);
+			}
+
+			// Screw
+			if (r.getScrewHeight() > 0) {
+				// Half dome
+				gl.glClipPlane(GL2.GL_CLIP_PLANE0, new double[] { 0, 0, 1, 0 }, 0);
+				gl.glEnable(GL2.GL_CLIP_PLANE0);
+				gl.glScaled(1, 1, r.getScrewHeight() / (r.getOuterDiameter() / 2));
+				glu.gluSphere(q, r.getOuterDiameter() / 2.0, LOD, LOD);
+				gl.glDisable(GL2.GL_CLIP_PLANE0);
+
+				// Closing disk
+				glu.gluQuadricOrientation(q, GLU.GLU_INSIDE);
+				glu.gluDisk(q, ir, or, LOD, 2);
+			}
 
 		}
 	}

@@ -77,9 +77,11 @@ public class ComponentPresetTable extends JTable {
 				if ( columnIndex != 0 ) {
 					return;
 				}
+				int selectedRow = ComponentPresetTable.this.getSelectedRow();
 				ComponentPreset preset = ComponentPresetTable.this.presets.get(rowIndex);
 				Application.getComponentPresetDao().setFavorite(preset, presetType, (Boolean) aValue);
 				ComponentPresetTable.this.updateFavorites();
+				ComponentPresetTable.this.setRowSelectionInterval(selectedRow, selectedRow);
 			}
 
 			@Override
@@ -126,12 +128,27 @@ public class ComponentPresetTable extends JTable {
 						}
 						
 					});
+				} else if ( key.getType() == Boolean.class ) {
+					sorter.setComparator(index, new Comparator<Boolean>() {
+
+						@Override
+						public int compare(Boolean b1, Boolean b2) {
+							if (b1 && !b2) {
+								return 1;
+							} else if (!b1 && b2) {
+								return -1;
+							} else {
+								return 0;
+							}
+						}
+						});
 				}
+				
 				if ( visibleColumnKeys.indexOf(key) < 0 ) {
 					hiddenColumns.add(columns[index]);
 				}
 				index ++;
-			}
+				}
 		}
 
 		this.setAutoCreateColumnsFromModel(false);
@@ -139,6 +156,7 @@ public class ComponentPresetTable extends JTable {
 		this.setModel(tableModel);
 		this.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 		this.setRowSorter(sorter);
+		sorter.toggleSortOrder(2);		// Sort by the first column (manufacturer) by default
 
 		for ( TableColumn hiddenColumn : hiddenColumns ) {
 			tableColumnModel.setColumnVisible(hiddenColumn, false);
@@ -163,6 +181,10 @@ public class ComponentPresetTable extends JTable {
 				}
 			}
 		});
+	}
+
+	public XTableColumnModel getXColumnModel() {
+		return tableColumnModel;
 	}
 
 	public void setRowFilter( RowFilter<? super TableModel ,? super Integer> filter ) {

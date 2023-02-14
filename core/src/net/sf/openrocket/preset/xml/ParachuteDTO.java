@@ -23,6 +23,12 @@ public class ParachuteDTO extends BaseComponentDTO {
     private AnnotatedLengthDTO diameter;
     @XmlElement(name = "Sides")
     private Integer sides;
+	@XmlElement(name = "PackedDiameter")
+	private AnnotatedLengthDTO PackedDiameter;
+	@XmlElement(name = "PackedLength")
+	private AnnotatedLengthDTO PackedLength;
+	@XmlElement(name = "DragCoefficient")
+	private AnnotatedLengthDTO dragCoefficient;
     @XmlElement(name = "LineCount")
     private Integer lineCount;
     @XmlElement(name = "LineLength")
@@ -56,6 +62,38 @@ public class ParachuteDTO extends BaseComponentDTO {
 	public void setSides(Integer sides) {
 		this.sides = sides;
 	}
+
+
+	public double getPackedDiameter() {
+		return PackedDiameter.getValue();
+	}
+
+	public void setPackedDiameter(AnnotatedLengthDTO PackedDiameter) {
+		this.PackedDiameter = PackedDiameter;
+	}
+	public void setPackedDiameter(double PackedDiameter) {
+		this.PackedDiameter = new AnnotatedLengthDTO(PackedDiameter);
+	}
+
+	public double getPackedLength() {
+		return PackedLength.getValue();
+	}
+
+	public void setPackedLength(AnnotatedLengthDTO PackedLength) {
+		this.PackedLength = PackedLength;
+	}
+	public void setPackedLength(double PackedLength) {
+		this.PackedLength = new AnnotatedLengthDTO(PackedLength);
+	}
+
+	public double getDragCoefficient() {
+		return dragCoefficient.getValue();
+	}
+
+	public void setDragCoefficient(AnnotatedLengthDTO DragCoefficient) {
+		this.dragCoefficient = DragCoefficient;
+	}
+	public void setDragCoefficient(double DragCoefficient) { this.dragCoefficient = new AnnotatedLengthDTO(DragCoefficient); }
 
 	public Integer getLineCount() {
 		return lineCount;
@@ -102,23 +140,42 @@ public class ParachuteDTO extends BaseComponentDTO {
         if ( preset.has(ComponentPreset.SIDES)) {
         	setSides(preset.get(ComponentPreset.SIDES));
         }
+		if ( preset.has(ComponentPreset.PACKED_DIAMETER)) {
+			setPackedDiameter(preset.get(ComponentPreset.PACKED_DIAMETER));
+		}
+		if ( preset.has(ComponentPreset.PACKED_LENGTH)) {
+			setPackedLength(preset.get(ComponentPreset.PACKED_LENGTH));
+		}
+		if ( preset.has(ComponentPreset.CD)) {
+			setDragCoefficient(preset.get(ComponentPreset.CD));
+		}
         if ( preset.has(ComponentPreset.LINE_MATERIAL)) {
         	setLineMaterial(new AnnotatedMaterialDTO(preset.get(ComponentPreset.LINE_MATERIAL)));
         }
     }
 
     @Override
-    public ComponentPreset asComponentPreset(java.util.List<MaterialDTO> materials) throws InvalidComponentPresetException {
-        return asComponentPreset(ComponentPreset.Type.PARACHUTE, materials);
+    public ComponentPreset asComponentPreset(Boolean legacy, java.util.List<MaterialDTO> materials) throws InvalidComponentPresetException {
+        return asComponentPreset(legacy, ComponentPreset.Type.PARACHUTE, materials);
     }
 
-    public ComponentPreset asComponentPreset(ComponentPreset.Type type, List<MaterialDTO> materials) throws InvalidComponentPresetException {
+    public ComponentPreset asComponentPreset(Boolean legacy, ComponentPreset.Type type, List<MaterialDTO> materials) throws InvalidComponentPresetException {
         TypedPropertyMap props = new TypedPropertyMap();
+		props.put(ComponentPreset.LEGACY, legacy);
         addProps(props, materials);
         // TODO - seems some vendors use a bulk material for the sheet along with a Thickness.
         // need to fix the MATERIAL packed into the componentpreset.
         props.put(ComponentPreset.TYPE, type);
         props.put(ComponentPreset.DIAMETER, this.getDiameter());
+		if ( this.PackedDiameter != null ) {
+			props.put(ComponentPreset.PACKED_DIAMETER, this.getPackedDiameter());
+		}
+		if ( this.PackedLength != null ) {
+			props.put(ComponentPreset.PACKED_LENGTH, this.getPackedLength());
+		}
+		if ( this.dragCoefficient != null ) {
+			props.put(ComponentPreset.CD, this.getDragCoefficient());
+		}
         props.put(ComponentPreset.LINE_COUNT, this.getLineCount());
         if ( this.lineLength != null ) {
         	props.put(ComponentPreset.LINE_LENGTH, this.getLineLength());

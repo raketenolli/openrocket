@@ -11,6 +11,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.awt.event.WindowListener;
 import java.util.ArrayList;
 import java.util.EventObject;
 import java.util.List;
@@ -82,6 +83,7 @@ public class ComponentAnalysisDialog extends JDialog implements StateChangeListe
 	private final JToggleButton worstToggle;
 	private boolean fakeChange = false;
 	private AerodynamicCalculator aerodynamicCalculator;
+	private double initTheta;
 
 	private final ColumnTableModel longitudeStabilityTableModel;
 	private final ColumnTableModel dragTableModel;
@@ -115,6 +117,7 @@ public class ComponentAnalysisDialog extends JDialog implements StateChangeListe
 		aoa = new DoubleModel(rocketPanel, "CPAOA", UnitGroup.UNITS_ANGLE, 0, Math.PI);
 		rocketPanel.setCPMach(Application.getPreferences().getDefaultMach());
 		mach = new DoubleModel(rocketPanel, "CPMach", UnitGroup.UNITS_COEFFICIENT, 0);
+		initTheta = rocketPanel.getFigure().getRotation();
 		rocketPanel.setCPTheta(rocketPanel.getFigure().getRotation());
 		theta = new DoubleModel(rocketPanel, "CPTheta", UnitGroup.UNITS_ANGLE, 0, 2 * Math.PI);
 		rocketPanel.setCPRoll(0);
@@ -148,7 +151,7 @@ public class ComponentAnalysisDialog extends JDialog implements StateChangeListe
 		JScrollPane scrollPane = new JScrollPane(warningList);
 		////Warnings:
 		scrollPane.setBorder(BorderFactory.createTitledBorder(trans.get("componentanalysisdlg.TitledBorder.warnings")));
-		panel.add(scrollPane, "gap paragraph, spany 4, width 300lp!, growy 1, height :100lp:, wrap");
+		panel.add(scrollPane, "gap paragraph, spany 4, wmin 300lp, grow, height :100lp:, wrap");
 
 		////Angle of attack:
 		panel.add(new JLabel(trans.get("componentanalysisdlg.lbl.angleofattack")), "width 120lp!");
@@ -168,8 +171,10 @@ public class ComponentAnalysisDialog extends JDialog implements StateChangeListe
 
 		// Stage and motor selection:
 		//// Active stages:
+		StageSelector stageSelector = new StageSelector(rkt);
+		rkt.addChangeListener(stageSelector);
 		panel.add(new JLabel(trans.get("componentanalysisdlg.lbl.activestages")), "spanx, split, gapafter rel");
-		panel.add(new StageSelector( rkt), "gapafter paragraph");
+		panel.add(stageSelector, "gapafter paragraph");
 
 		//// Motor configuration:
 		JLabel label = new JLabel(trans.get("componentanalysisdlg.lbl.motorconf"));
@@ -183,7 +188,7 @@ public class ComponentAnalysisDialog extends JDialog implements StateChangeListe
 		// Tabbed pane
 
 		JTabbedPane tabbedPane = new JTabbedPane();
-		panel.add(tabbedPane, "spanx, growx, growy");
+		panel.add(tabbedPane, "spanx, growx, growy, pushy");
 
 
 		// Create the Longitudinal Stability (CM vs CP) data table
@@ -194,6 +199,7 @@ public class ComponentAnalysisDialog extends JDialog implements StateChangeListe
 					@Override
 					public Object getValueAt(int row) {
 						Object c = stabData.get(row).name;
+						
 						return c.toString();
 					}
 
@@ -232,7 +238,7 @@ public class ComponentAnalysisDialog extends JDialog implements StateChangeListe
 					
 					@Override
 					public Object getValueAt(int row) {
-						return NOUNIT.toString(stabData.get(row).cpx);
+						return unit.toString(stabData.get(row).cpx);
 					}
 				},
 				new Column("<html>C<sub>N<sub>" + ALPHA + "</sub></sub>") {
@@ -415,7 +421,8 @@ public class ComponentAnalysisDialog extends JDialog implements StateChangeListe
 
 
 
-		// Add the data updater to listen to changes in aoa and theta
+		// Add the data updater to listen to changes
+		rkt.addChangeListener(this);
 		mach.addChangeListener(this);
 		theta.addChangeListener(this);
 		aoa.addChangeListener(this);
@@ -428,10 +435,13 @@ public class ComponentAnalysisDialog extends JDialog implements StateChangeListe
 		this.addWindowListener(new WindowAdapter() {
 			@Override
 			public void windowClosed(WindowEvent e) {
+				theta.setValue(initTheta);
+
 				//System.out.println("Closing method called: " + this);
+				rkt.removeChangeListener(ComponentAnalysisDialog.this);
+				mach.removeChangeListener(ComponentAnalysisDialog.this);
 				theta.removeChangeListener(ComponentAnalysisDialog.this);
 				aoa.removeChangeListener(ComponentAnalysisDialog.this);
-				mach.removeChangeListener(ComponentAnalysisDialog.this);
 				roll.removeChangeListener(ComponentAnalysisDialog.this);
 				//System.out.println("SETTING NAN VALUES");
 				rocketPanel.setCPAOA(Double.NaN);
@@ -532,11 +542,6 @@ public class ComponentAnalysisDialog extends JDialog implements StateChangeListe
 		rollData.clear();
 
 		for(final RocketComponent comp: configuration.getAllComponents()) {
-			// // this is actually redundant, because the analysis will not contain inactive stages.
-			// if (!configuration.isComponentActive(comp)) {
-			// 	continue;
-			// }
-
 			CMAnalysisEntry cmEntry = cmMap.get(comp.hashCode());
 			if (null == cmEntry) {
 				log.warn("Could not find massData entry for component: " + comp.getName());
@@ -547,7 +552,11 @@ public class ComponentAnalysisDialog extends JDialog implements StateChangeListe
 				continue;
 			}
 
-			LongitudinalStabilityRow row = new LongitudinalStabilityRow(cmEntry.name, cmEntry.source);
+			String name = cmEntry.name;
+			if (cmEntry.source instanceof Rocket) {
+				name = trans.get("componentanalysisdlg.TOTAL");
+			}
+			LongitudinalStabilityRow row = new LongitudinalStabilityRow(name, cmEntry.source);
 			stabData.add(row);
 
 			row.source = cmEntry.source;
@@ -562,7 +571,12 @@ public class ComponentAnalysisDialog extends JDialog implements StateChangeListe
 			}
 
 			if (forces.getCP() != null) {
-				row.cpx = forces.getCP().x;
+				if ((comp instanceof Rocket) &&
+					(forces.getCP().weight < MathUtil.EPSILON)) {
+					row.cpx = Double.NaN;
+				} else {
+					row.cpx = forces.getCP().x;
+				}
 				row.cna = forces.getCNa();
 			}
 
@@ -667,7 +681,7 @@ public class ComponentAnalysisDialog extends JDialog implements StateChangeListe
 
 				// A drag coefficient
 				double cd = (Double) value;
-				this.setText(String.format("%.2f (%.0f%%)", cd, 100 * cd / totalCD));
+				this.setText(String.format("%.3f (%.0f%%)", cd, 100 * cd / totalCD));
 
 				float r = (float) (cd / 1.5);
 

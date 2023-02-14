@@ -2,6 +2,7 @@ package net.sf.openrocket.gui.dialogs.motor.thrustcurve;
 
 import java.awt.Color;
 import java.awt.Component;
+import java.awt.Font;
 import java.awt.Paint;
 import java.awt.Rectangle;
 import java.awt.event.ActionEvent;
@@ -11,11 +12,13 @@ import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.EventObject;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.prefs.Preferences;
 
+import javax.swing.ButtonGroup;
 import javax.swing.DefaultComboBoxModel;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
@@ -23,6 +26,7 @@ import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
+import javax.swing.JRadioButton;
 import javax.swing.JScrollPane;
 import javax.swing.JSeparator;
 import javax.swing.JTabbedPane;
@@ -36,9 +40,12 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
+import javax.swing.event.RowSorterEvent;
+import javax.swing.event.RowSorterListener;
 import javax.swing.table.TableModel;
 import javax.swing.table.TableRowSorter;
 
+import net.sf.openrocket.util.StateChangeListener;
 import org.jfree.chart.ChartColor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -93,6 +100,7 @@ public class ThrustCurveMotorSelectionPanel extends JPanel implements MotorSelec
 	private final JComboBox<MotorHolder> curveSelectionBox;
 	private final DefaultComboBoxModel<MotorHolder> curveSelectionModel;
 	private final JComboBox<String> delayBox;
+	private final JLabel nrOfMotorsLabel;
 
 	private final MotorInformationPanel motorInformationPanel;
 	private final MotorFilterPanel motorFilterPanel;
@@ -106,14 +114,7 @@ public class ThrustCurveMotorSelectionPanel extends JPanel implements MotorSelec
 		setMotorMountAndConfig( fcid, mount );
 
 	}
-	
-	/**
-	 * Sole constructor.
-	 * 
-	 * @param current	the currently selected ThrustCurveMotor, or <code>null</code> for none.
-	 * @param delay		the currently selected ejection charge delay.
-	 * @param diameter	the diameter of the motor mount.
-	 */
+
 	public ThrustCurveMotorSelectionPanel() {
 		super(new MigLayout("fill", "[grow][]"));
 
@@ -229,6 +230,47 @@ public class ThrustCurveMotorSelectionPanel extends JPanel implements MotorSelec
 			
 		}
 
+		//// Motor name column
+		{
+			JLabel motorNameColumn = new JLabel(trans.get("TCMotorSelPan.lbl.motorNameColumn"));
+			motorNameColumn.setToolTipText(trans.get("TCMotorSelPan.lbl.motorNameColumn.ttip"));
+			JRadioButton commonName = new JRadioButton(trans.get("TCMotorSelPan.btn.commonName"));
+			JRadioButton designation = new JRadioButton(trans.get("TCMotorSelPan.btn.designation"));
+			ButtonGroup bg = new ButtonGroup();
+			bg.add(commonName);
+			bg.add(designation);
+			commonName.addActionListener(new ActionListener() {
+				@Override
+				public void actionPerformed(ActionEvent e) {
+					((SwingPreferences) Application.getPreferences()).setMotorNameColumn(false);
+					int selectedRow = table.getSelectedRow();
+					model.fireTableDataChanged();
+					if (selectedRow >= 0) {
+						table.setRowSelectionInterval(selectedRow, selectedRow);
+					}
+				}
+			});
+			designation.addActionListener(new ActionListener() {
+				@Override
+				public void actionPerformed(ActionEvent e) {
+					((SwingPreferences) Application.getPreferences()).setMotorNameColumn(true);
+					int selectedRow = table.getSelectedRow();
+					model.fireTableDataChanged();
+					if (selectedRow >= 0) {
+						table.setRowSelectionInterval(selectedRow, selectedRow);
+					}
+				}
+			});
+
+			boolean initValue = ((SwingPreferences) Application.getPreferences()).getMotorNameColumn();
+			commonName.setSelected(!initValue);
+			designation.setSelected(initValue);
+
+			panel.add(motorNameColumn, "gapleft para");
+			panel.add(commonName);
+			panel.add(designation, "spanx, growx, wrap");
+		}
+
 		//// Motor selection table
 		{
 			table = new JTable(model);
@@ -258,17 +300,7 @@ public class ThrustCurveMotorSelectionPanel extends JPanel implements MotorSelec
 			table.getSelectionModel().addListSelectionListener(new ListSelectionListener() {
 				@Override
 				public void valueChanged(ListSelectionEvent e) {
-					int row = table.getSelectedRow();
-					if (row >= 0) {
-						row = table.convertRowIndexToModel(row);
-						ThrustCurveMotorSet motorSet = model.getMotorSet(row);
-						log.info(Markers.USER_MARKER, "Selected table row " + row + ": " + motorSet);
-						if (motorSet != selectedMotorSet) {
-							select(selectMotor(motorSet));
-						}
-					} else {
-						log.info(Markers.USER_MARKER, "Selected table row " + row + ", nothing selected");
-					}
+					selectMotorFromTable();
 				}
 			});
 			table.addMouseListener(new MouseAdapter() {
@@ -284,8 +316,30 @@ public class ThrustCurveMotorSelectionPanel extends JPanel implements MotorSelec
 
 			JScrollPane scrollpane = new JScrollPane();
 			scrollpane.setViewportView(table);
-			panel.add(scrollpane, "grow, width :500:, spanx, wrap");
+			panel.add(scrollpane, "grow, width :500:, spanx, push, wrap");
 
+		}
+
+		// Number of motors
+		{
+			nrOfMotorsLabel = new JLabel();
+			nrOfMotorsLabel.setToolTipText(trans.get("TCMotorSelPan.lbl.ttip.nrOfMotors"));
+			updateNrOfMotors();
+			nrOfMotorsLabel.setForeground(Color.darkGray);
+			nrOfMotorsLabel.setFont(new Font(Font.SANS_SERIF, Font.ITALIC, 11));
+			panel.add(nrOfMotorsLabel, "gapleft para, spanx, wrap");
+			sorter.addRowSorterListener(new RowSorterListener() {
+				@Override
+				public void sorterChanged(RowSorterEvent e) {
+					updateNrOfMotors();
+				}
+			});
+			rowFilter.addChangeListener(new StateChangeListener() {
+				@Override
+				public void stateChanged(EventObject e) {
+					updateNrOfMotors();
+				}
+			});
 		}
 
 		// Search field
@@ -326,11 +380,13 @@ public class ThrustCurveMotorSelectionPanel extends JPanel implements MotorSelec
 		rightSide.add(trans.get("TCMotorSelPan.btn.filter"), motorFilterPanel);
 		rightSide.add(trans.get("TCMotorSelPan.btn.details"), motorInformationPanel);
 
-		this.add(rightSide);
+		this.add(rightSide, "growy");
 
 		// Update the panel data
 		updateData();
 		setDelays(false);
+		hideUnavailableBox.getActionListeners()[0].actionPerformed(null);
+		hideSimilarBox.getActionListeners()[0].actionPerformed(null);
 
 	}
 
@@ -499,6 +555,17 @@ public class ThrustCurveMotorSelectionPanel extends JPanel implements MotorSelec
 		return motors;
 	}
 
+	private void updateNrOfMotors() {
+		if (table != null && nrOfMotorsLabel != null) {
+			int rowCount = table.getRowCount();
+			String motorCount = "None";
+			if (rowCount > 0) {
+				motorCount = String.valueOf(rowCount);
+			}
+			nrOfMotorsLabel.setText(trans.get("TCMotorSelPan.lbl.nrOfMotors") + " " + motorCount);
+		}
+	}
+
 
 	private void scrollSelectionVisible() {
 		if (selectedMotorSet != null) {
@@ -565,6 +632,23 @@ public class ThrustCurveMotorSelectionPanel extends JPanel implements MotorSelec
 		// No motor has been used
 		Collections.sort(list, MOTOR_COMPARATOR);
 		return list.get(0);
+	}
+
+	/**
+	 * Selects a new motor based on the selection in the motor table
+	 */
+	public void selectMotorFromTable() {
+		int row = table.getSelectedRow();
+		if (row >= 0) {
+			row = table.convertRowIndexToModel(row);
+			ThrustCurveMotorSet motorSet = model.getMotorSet(row);
+			log.info(Markers.USER_MARKER, "Selected table row " + row + ": " + motorSet);
+			if (motorSet != selectedMotorSet) {
+				select(selectMotor(motorSet));
+			}
+		} else {
+			log.info(Markers.USER_MARKER, "Selected table row " + row + ", nothing selected");
+		}
 	}
 
 

@@ -7,8 +7,12 @@ import net.sf.openrocket.rocketcomponent.InnerTube;
 import net.sf.openrocket.rocketcomponent.MotorMount;
 import net.sf.openrocket.rocketcomponent.RocketComponent;
 import net.sf.openrocket.startup.Application;
+import net.sf.openrocket.util.ArrayList;
 import net.sf.openrocket.util.Coordinate;
 import net.sf.openrocket.util.Inertia;
+
+import java.util.LinkedList;
+import java.util.List;
 
 /**
  * A single motor configuration.  This includes the selected motor
@@ -28,6 +32,8 @@ public class MotorConfiguration implements FlightConfigurableParameter<MotorConf
 	private boolean ignitionOveride = false;
 	private double ignitionDelay = 0.0;
 	private IgnitionEvent ignitionEvent = IgnitionEvent.AUTOMATIC;
+
+	private final List<MotorConfiguration> configListeners = new LinkedList<>();
 	
 	private int modID = 0;
 	
@@ -62,11 +68,11 @@ public class MotorConfiguration implements FlightConfigurableParameter<MotorConf
 		return ignitionOveride;
 	}
 
-	public String toMotorDesignation(){
+	public String toMotorCommonName(){
 		if( motor == null ){
 			return trans.get("empty");
 		}else{
-			return this.motor.getDesignation(this.getEjectionDelay());
+			return this.motor.getCommonName(this.getEjectionDelay());
 		}
 	}
 	
@@ -84,6 +90,10 @@ public class MotorConfiguration implements FlightConfigurableParameter<MotorConf
 		
 	public void setMotor(Motor motor){
 		this.motor = motor;
+
+		for (MotorConfiguration listener : configListeners) {
+			listener.setMotor(motor);
+		}
 	}
 	
 	public Motor getMotor() {
@@ -100,6 +110,10 @@ public class MotorConfiguration implements FlightConfigurableParameter<MotorConf
 	
 	public void setEjectionDelay(double delay) {
 		this.ejectionDelay = delay;
+
+		for (MotorConfiguration listener : configListeners) {
+			listener.setEjectionDelay(delay);
+		}
 	}
 	
 	public Coordinate getPosition(){
@@ -115,6 +129,12 @@ public class MotorConfiguration implements FlightConfigurableParameter<MotorConf
 	
 	public void useDefaultIgnition() {
 		this.ignitionOveride = false;
+		setIgnitionDelay(0);
+		setIgnitionEvent(IgnitionEvent.AUTOMATIC);
+
+		for (MotorConfiguration listener : configListeners) {
+			listener.useDefaultIgnition();
+		}
 	}
 	
 	public double getIgnitionDelay() {
@@ -124,6 +144,10 @@ public class MotorConfiguration implements FlightConfigurableParameter<MotorConf
 	public void setIgnitionDelay(final double _delay) {
 		this.ignitionDelay = _delay;
 		this.ignitionOveride = true;
+
+		for (MotorConfiguration listener : configListeners) {
+			listener.setIgnitionDelay(_delay);
+		}
 	}
 	
 	public IgnitionEvent getIgnitionEvent() {
@@ -133,6 +157,10 @@ public class MotorConfiguration implements FlightConfigurableParameter<MotorConf
 	public void setIgnitionEvent(final IgnitionEvent _event) {
 		this.ignitionEvent = _event;
 		this.ignitionOveride = true;
+
+		for (MotorConfiguration listener : configListeners) {
+			listener.setIgnitionEvent(_event);
+		}
 	}
 	
 
@@ -224,6 +252,16 @@ public class MotorConfiguration implements FlightConfigurableParameter<MotorConf
         return clone;
     }
 
+	public void copyFrom(MotorConfiguration configuration) {
+		if (configuration == null) return;
+
+		this.motor = configuration.motor;
+		this.ejectionDelay = configuration.ejectionDelay;
+		this.ignitionOveride = configuration.ignitionOveride;
+		this.ignitionDelay = configuration.ignitionDelay;
+		this.ignitionEvent = configuration.ignitionEvent;
+	}
+
 
 
     public int getModID() {
@@ -235,7 +273,7 @@ public class MotorConfiguration implements FlightConfigurableParameter<MotorConf
 	}
 
 	public String toDescription(){
-		return ( this.toMotorDesignation()+
+		return ( this.toMotorCommonName()+
 				" in: "+mount.getDebugName()+
 				" ign@: "+this.toIgnitionDescription() );
 	}
@@ -251,11 +289,35 @@ public class MotorConfiguration implements FlightConfigurableParameter<MotorConf
 				mount.getDebugName(),
 				fcid.toShortKey(),
 				mid.toDebug(),
-				toMotorDesignation(),
+				toMotorCommonName(),
 				toIgnitionDescription() ));
 		
 		return buf.toString();
 	}
 
+	/**
+	 * Add a new config listener that will undergo the same configuration changes as this configuration.
+	 * @param listener new config listener
+	 * @return true if listener was successfully added, false if not
+	 */
+	public boolean addConfigListener(MotorConfiguration listener) {
+		if (listener == null) {
+			return false;
+		}
+		configListeners.add(listener);
+		return true;
+	}
+
+	public void removeConfigListener(MotorConfiguration listener) {
+		configListeners.remove(listener);
+	}
+
+	public void clearConfigListeners() {
+		configListeners.clear();
+	}
+
+	public List<MotorConfiguration> getConfigListeners() {
+		return configListeners;
+	}
 
 }

@@ -5,6 +5,10 @@ import net.sf.openrocket.simulation.FlightEvent;
 import net.sf.openrocket.startup.Application;
 import net.sf.openrocket.util.MathUtil;
 
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Objects;
+
 public class StageSeparationConfiguration implements FlightConfigurableParameter<StageSeparationConfiguration> {
 	
 	public static enum SeparationEvent {
@@ -56,14 +60,6 @@ public class StageSeparationConfiguration implements FlightConfigurableParameter
 				return (mount == ignition);
 			}
 		},
-		//// Launch
-		LAUNCH(trans.get("Stage.SeparationEvent.LAUNCH")) {
-			@Override
-			public boolean isSeparationEvent(FlightEvent e, AxialStage stage) {
-				return e.getType() == FlightEvent.Type.LAUNCH;
-			}
-		},
-		//// Never
 		NEVER(trans.get("Stage.SeparationEvent.NEVER")) {
 			@Override
 			public boolean isSeparationEvent(FlightEvent e, AxialStage stage) {
@@ -94,14 +90,20 @@ public class StageSeparationConfiguration implements FlightConfigurableParameter
 	private static final Translator trans = Application.getTranslator();
 	
 	
-	private SeparationEvent separationEvent = SeparationEvent.NEVER;
+	private SeparationEvent separationEvent = SeparationEvent.EJECTION;
 	private double separationDelay = 0;
+
+	private final List<StageSeparationConfiguration> configListeners = new LinkedList<>();
 		
 	public SeparationEvent getSeparationEvent() {
 		return separationEvent;
 	}
 	
 	public void setSeparationEvent(SeparationEvent separationEvent) {
+		for (StageSeparationConfiguration listener : configListeners) {
+			listener.setSeparationEvent(separationEvent);
+		}
+
 		if (separationEvent == null) {
 			throw new NullPointerException("separationEvent is null");
 		}
@@ -117,6 +119,10 @@ public class StageSeparationConfiguration implements FlightConfigurableParameter
 	}
 	
 	public void setSeparationDelay(double separationDelay) {
+		for (StageSeparationConfiguration listener : configListeners) {
+			listener.setSeparationDelay(separationDelay);
+		}
+
 		if (MathUtil.equals(this.separationDelay, separationDelay)) {
 			return;
 		}
@@ -144,8 +150,20 @@ public class StageSeparationConfiguration implements FlightConfigurableParameter
 		clone.separationDelay = this.separationDelay;
 		return clone;
 	}
-	
-	
+
+	@Override
+	public boolean equals(Object o) {
+		if (this == o) return true;
+		if (o == null || getClass() != o.getClass()) return false;
+		StageSeparationConfiguration that = (StageSeparationConfiguration) o;
+		return Double.compare(that.separationDelay, separationDelay) == 0 && separationEvent == that.separationEvent;
+	}
+
+	@Override
+	public int hashCode() {
+		return Objects.hash(separationEvent, separationDelay);
+	}
+
 	private void fireChangeEvent() {
 
 	}
@@ -153,6 +171,31 @@ public class StageSeparationConfiguration implements FlightConfigurableParameter
 
 	@Override
 	public void update(){
+	}
+
+	/**
+	 * Add a new config listener that will undergo the same configuration changes as this configuration.
+	 * @param listener new config listener
+	 * @return true if listener was successfully added, false if not
+	 */
+	public boolean addConfigListener(StageSeparationConfiguration listener) {
+		if (listener == null) {
+			return false;
+		}
+		configListeners.add(listener);
+		return true;
+	}
+
+	public void removeConfigListener(StageSeparationConfiguration listener) {
+		configListeners.remove(listener);
+	}
+
+	public void clearConfigListeners() {
+		configListeners.clear();
+	}
+
+	public List<StageSeparationConfiguration> getConfigListeners() {
+		return configListeners;
 	}
 	
 }

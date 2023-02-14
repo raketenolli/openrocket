@@ -1,7 +1,8 @@
 <project name="OpenRocket-Core" basedir=".">
 
 	<property file="resources/build.properties" />
-	
+
+	<property name="root.dir"    	value=".."/>					<!-- Root directory -->
 	<property name="src.dir"    	value="${basedir}/src"/>		<!-- Source directory -->
 	<property name="src-test.dir"	value="${basedir}/test"/>		<!-- Test directory -->
 	<property name="build.dir"   	value="${basedir}/build"/>		<!-- Build directory -->
@@ -34,6 +35,7 @@
 		<pathelement location="${build-test.dir}"/>
 		<pathelement location="${classes.dir}"/>
 		<pathelement location="${src-test.dir}"/>
+		<pathelement location="${root.dir}"/>
 		<fileset dir="${libtest.dir}/" includes="*.jar"/>
 	</path>
 
@@ -53,12 +55,14 @@
 	
 	<!-- BUILD -->
 	<target name="build">
+		<echo level="info">Java/JVM version: ${ant.java.version}</echo>
+		<echo level="info">Java/JVM detail version: ${java.version}</echo>
 		<mkdir dir="${classes.dir}"/>
 		<echo level="info">Compiling main classes</echo>
 		<javac debug="true" srcdir="${src.dir}" destdir="${classes.dir}" classpathref="classpath" includeantruntime="false" source="1.8" target="1.8"/>
 	</target>
 	
-	<!-- Executible Eclipse-Jar-In-Jar style JAR -->
+	<!-- Executable Eclipse-Jar-In-Jar style JAR -->
 	<target name="jar" depends="build" description="Create the OpenRocket Core">
 		<mkdir dir="${jar.dir}" />
 		<jar destfile="${jar.file}" basedir="${dist.dir}">
@@ -69,10 +73,11 @@
 			
 			
 			<!-- Include metafiles about OR -->
-			<fileset dir="${basedir}" includes="LICENSE.TXT README.TXT ChangeLog ReleaseNotes fileformat.txt" />
+			<fileset dir="${basedir}/.." includes="LICENSE.TXT README.md ChangeLog ReleaseNotes.md fileformat.txt" />
 		</jar>
 	</target>
-	
+
+	<!-- Update thrust curves -->
 	<target name="serialize-motors" depends="build" description="Preprocess the motor files into serialized form">
 	    <java classname="net.sf.openrocket.thrustcurve.SerializeThrustcurveMotors"
 	          fork="true"
@@ -86,11 +91,15 @@
 	
 	<!--  Unit tests  -->
 	<target name="unittest" description="Execute unit tests" depends="build">
-		<echo>Building unit tests</echo>
+		<echo level="info">Building unit tests</echo>
+		<echo level="info">Java/JVM version: ${ant.java.version}</echo>
+		<echo level="info">Java/JVM detail version: ${java.version}</echo>
 		<mkdir dir="${build-test.dir}"/>
 		<javac debug="true" srcdir="${src-test.dir}" destdir="${build-test.dir}" classpathref="test-classpath" includeantruntime="false"/>
 		
 		<echo>Running unit tests</echo>
+		<echo level="info">Java/JVM version: ${ant.java.version}</echo>
+		<echo level="info">Java/JVM detail version: ${java.version}</echo>
 		<mkdir dir="${tmp.dir}/rawtestoutput"/>
 		<junit fork="yes" forkmode="once" printsummary="false" failureproperty="junit.failure" dir="${basedir}">
 			<classpath>

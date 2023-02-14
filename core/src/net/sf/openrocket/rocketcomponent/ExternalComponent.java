@@ -20,16 +20,39 @@ import net.sf.openrocket.unit.UnitGroup;
 public abstract class ExternalComponent extends RocketComponent {
 	
 	public enum Finish {
+
+		/*	The surface roughness changes are intended to begin the implementation of known values derived from
+		 *	the Thesis and Hoerner Fluid Dynamics. It is anticipated that the ability to enter a custom surface
+		 * 	roughness value will be added as a feature in the future.
+		 */
+
 		//// Rough
 		ROUGH("ExternalComponent.Rough", 500e-6),
+		//// Rough unfinished
+		ROUGHUNFINISHED("ExternalComponent.Roughunfinished", 250e-6),
 		//// Unfinished
 		UNFINISHED("ExternalComponent.Unfinished", 150e-6),
 		//// Regular paint
 		NORMAL("ExternalComponent.Regularpaint", 60e-6),
 		//// Smooth paint
 		SMOOTH("ExternalComponent.Smoothpaint", 20e-6),
+		//// Optimum paint
+		OPTIMUM("ExternalComponent.Optimumpaint", 5e-6),
 		//// Polished
-		POLISHED("ExternalComponent.Polished", 2e-6);
+		POLISHED("ExternalComponent.Polished", 2e-6),
+
+		/*	The "polished" surface roughness was originally set at 2.0 microns. However, after reviewing the Thesis
+		 * 	and  Hoerner Fluid Dynamics, upon which the Thesis surface roughness values were based, it was determined
+		 * 	that the "polished" surface roughness should have been 0.5 microns. To reduce the potential for causing
+		 * 	inadvertent errors, "POLISHED" was retained and "FINISHPOLISHED" added, with the correct values for each.
+		 * 	"POLISHED" is now described to the user as "Aircraft sheet-metal" with a value of 2.0 microns and
+		 * 	"FINISHPOLISHED" is now described to the user as "Polished" with a value of 0.5 microns.
+		 */
+
+		//// Optimum paint
+		FINISHPOLISHED("ExternalComponent.Finishedpolished", .5e-6),
+		//// Optimum paint
+		MIRROR("ExternalComponent.Mirror", 0.0e-6);
 		
 		private static final Translator trans = Application.getTranslator();
 		private final String name;
@@ -108,7 +131,13 @@ public abstract class ExternalComponent extends RocketComponent {
 			throw new IllegalArgumentException("ExternalComponent requires a bulk material" +
 					" type=" + mat.getType());
 		}
-		
+
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof ExternalComponent) {
+				((ExternalComponent) listener).setMaterial(mat);
+			}
+		}
+
 		if (material.equals(mat))
 			return;
 		material = mat;
@@ -121,6 +150,12 @@ public abstract class ExternalComponent extends RocketComponent {
 	}
 	
 	public void setFinish(Finish finish) {
+		for (RocketComponent listener : configListeners) {
+			if (listener instanceof ExternalComponent) {
+				((ExternalComponent) listener).setFinish(finish);
+			}
+		}
+
 		if (this.finish == finish)
 			return;
 		this.finish = finish;
@@ -132,7 +167,9 @@ public abstract class ExternalComponent extends RocketComponent {
 	protected void loadFromPreset(ComponentPreset preset) {
 		super.loadFromPreset(preset);
 		
-		// Surface finish is left unchanged
+		if (preset.has(ComponentPreset.FINISH)) {
+			setFinish(preset.get(ComponentPreset.FINISH));
+		}
 		
 		if (preset.has(ComponentPreset.MATERIAL)) {
 			Material mat = preset.get(ComponentPreset.MATERIAL);

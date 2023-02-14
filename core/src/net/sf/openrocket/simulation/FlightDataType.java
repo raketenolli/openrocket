@@ -57,9 +57,9 @@ public class FlightDataType implements Comparable<FlightDataType> {
 	
 	
 	//// Lateral position and motion
-	//// Position upwind
+	//// Position East of launch
 	public static final FlightDataType TYPE_POSITION_X = newType(trans.get("FlightDataType.TYPE_POSITION_X"), "Px", UnitGroup.UNITS_DISTANCE, 30);
-	//// Position parallel to wind
+	//// Position North of launch
 	public static final FlightDataType TYPE_POSITION_Y = newType(trans.get("FlightDataType.TYPE_POSITION_Y"), "Py", UnitGroup.UNITS_DISTANCE, 31);
 	//// Lateral distance
 	public static final FlightDataType TYPE_POSITION_XY = newType(trans.get("FlightDataType.TYPE_POSITION_XY"), "Pl", UnitGroup.UNITS_DISTANCE, 32);
@@ -251,7 +251,7 @@ public class FlightDataType implements Comparable<FlightDataType> {
 	 * This returns an existing data type if the symbol matches that of an existing type. 
 	 * 
 	 * If the symbol matches but the unit and description information differ, then the old stored datatype
-	 * is erased and the updated version based on the given parametes is returned.
+	 * is erased and the updated version based on the given parameters is returned.
 	 * The only exception is if the description or unitgroup are undefined (null or empty string). In this case 
 	 * we just get these parameters from the existing type when making the new one.
 	 * 

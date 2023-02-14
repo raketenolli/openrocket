@@ -1,9 +1,9 @@
 package net.sf.openrocket.rocketcomponent;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import net.sf.openrocket.util.Transformation;
 
@@ -13,7 +13,7 @@ import net.sf.openrocket.util.Transformation;
  * @author teyrana (aka Daniel Williams) <equipoise@gmail.com>
  *
  */
-public class InstanceMap extends HashMap<RocketComponent, ArrayList<InstanceContext>> {
+public class InstanceMap extends ConcurrentHashMap<RocketComponent, ArrayList<InstanceContext>> {
 
 	// =========== Public Functions ========================
 
@@ -27,15 +27,13 @@ public class InstanceMap extends HashMap<RocketComponent, ArrayList<InstanceCont
 		}
 	}
 
-	public void emplace(final RocketComponent component, boolean active, int number, final Transformation xform) {
-		final RocketComponent key = component;
-
-		if(!containsKey(component)) {
-			put(key, new ArrayList<InstanceContext>());
+	public void emplace(final RocketComponent component, int number, final Transformation transform) {
+		if (!containsKey(component)) {
+			put(component, new ArrayList<>());
 		}
 
-		final InstanceContext context = new InstanceContext(component, active, number, xform);
-		get(key).add(context);
+		final InstanceContext context = new InstanceContext(component, number, transform);
+		get(component).add(context);
 	}
 
 	public List<InstanceContext> getInstanceContexts(final RocketComponent key) {

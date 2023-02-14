@@ -3,7 +3,7 @@ package net.sf.openrocket.file;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintWriter;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -29,6 +29,8 @@ public class CSVExport {
 	 * @param fields				the fields to export (in appropriate order).
 	 * @param units					the units of the fields.
 	 * @param fieldSeparator		the field separator string.
+	 * @param decimalPlaces			the number of decimal places to use.
+	 * @param isExponentialNotation	whether to use exponential notation.
 	 * @param commentStarter		the comment starting character(s).
 	 * @param simulationComments	whether to output general simulation comments.
 	 * @param fieldComments			whether to output field comments.
@@ -37,8 +39,9 @@ public class CSVExport {
 	 */
 	public static void exportCSV(OutputStream stream, Simulation simulation,
 			FlightDataBranch branch, FlightDataType[] fields, Unit[] units,
-			String fieldSeparator, String commentStarter, boolean simulationComments,
-			boolean fieldComments, boolean eventComments) throws IOException {
+			String fieldSeparator, int decimalPlaces, boolean isExponentialNotation,
+			String commentStarter, boolean simulationComments, boolean fieldComments,
+			boolean eventComments) throws IOException {
 
 		if (fields.length != units.length) {
 			throw new IllegalArgumentException("fields and units lengths must be equal " +
@@ -49,7 +52,7 @@ public class CSVExport {
 		PrintWriter writer = null;
 		try {
 
-			writer = new PrintWriter(stream, false, Charset.forName("UTF-8"));
+			writer = new PrintWriter(stream, false, StandardCharsets.UTF_8);
 
 			// Write the initial comments
 			if (simulationComments) {
@@ -71,7 +74,7 @@ public class CSVExport {
 				writer.println();
 			}
 
-			writeData(writer, branch, fields, units, fieldSeparator,
+			writeData(writer, branch, fields, units, fieldSeparator, decimalPlaces, isExponentialNotation,
 					eventComments, commentStarter);
 
 
@@ -87,13 +90,13 @@ public class CSVExport {
 	}
 
 	private static void writeData(PrintWriter writer, FlightDataBranch branch,
-			FlightDataType[] fields, Unit[] units, String fieldSeparator, boolean eventComments,
-			String commentStarter) {
+			FlightDataType[] fields, Unit[] units, String fieldSeparator, int decimalPlaces, boolean isExponentialNotation,
+			boolean eventComments, String commentStarter) {
 
 		// Number of data points
 		int n = branch.getLength();
 
-		// Flight events in occurrance order
+		// Flight events in occurrence order
 		List<FlightEvent> events = branch.getEvents();
 		Collections.sort(events);
 		int eventPosition = 0;
@@ -132,7 +135,8 @@ public class CSVExport {
 			// Store CSV line
 			for (int i = 0; i < fields.length; i++) {
 				double value = fieldValues.get(i).get(pos);
-				writer.print(TextUtil.doubleToString(units[i].toUnit(value)));
+				writer.print(TextUtil.doubleToString(units[i].toUnit(value), decimalPlaces, isExponentialNotation));
+
 				if (i < fields.length - 1) {
 					writer.print(fieldSeparator);
 				}
@@ -178,7 +182,7 @@ public class CSVExport {
 			break;
 
 		case OUTDATED:
-			line += " (Data is out of date)";
+			line += " (Out of date)";
 			break;
 
 		case EXTERNAL:

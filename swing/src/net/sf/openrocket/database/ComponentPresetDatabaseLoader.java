@@ -1,5 +1,6 @@
 package net.sf.openrocket.database;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
@@ -28,7 +29,7 @@ public class ComponentPresetDatabaseLoader extends AsynchronousDatabaseLoader {
 	
 	private final static Logger log = LoggerFactory.getLogger(ComponentPresetDatabaseLoader.class);
 	
-	private static final String SYSTEM_PRESET_DIR = "datafiles/presets";
+	private static final String SYSTEM_PRESET_DIR = "datafiles/components";
 	private int fileCount = 0;
 	private int presetCount = 0;
 	
@@ -77,8 +78,8 @@ public class ComponentPresetDatabaseLoader extends AsynchronousDatabaseLoader {
 			return;
 		}
 		while (iterator.hasNext()) {
-			Pair<String, InputStream> f = iterator.next();
-			Collection<ComponentPreset> presets = loadFile(f.getU(), f.getV());
+			Pair<File, InputStream> f = iterator.next();
+			Collection<ComponentPreset> presets = loadFile(f.getU().getName(), f.getV());
 			componentPresetDao.addAll(presets);
 			fileCount++;
 			presetCount += presets.size();
@@ -91,23 +92,17 @@ public class ComponentPresetDatabaseLoader extends AsynchronousDatabaseLoader {
 	 */
 	private void loadPresetComponents() {
 		log.info("Loading component presets from " + SYSTEM_PRESET_DIR);
-		FileIterator iterator = DirectoryIterator.findDirectory(SYSTEM_PRESET_DIR, new SimpleFileFilter("", false, "ser"));
+		FileIterator iterator = DirectoryIterator.findDirectory(SYSTEM_PRESET_DIR, new SimpleFileFilter("", false, "orc"));
 		
 		if(iterator == null)
 			return;
-		
+
 		while (iterator.hasNext()) {
-			Pair<String, InputStream> f = iterator.next();
-			try {
-				ObjectInputStream ois = new ObjectInputStream(f.getV());
-				@SuppressWarnings("unchecked")
-				List<ComponentPreset> list = (List<ComponentPreset>) ois.readObject();
-				componentPresetDao.addAll(list);
-				fileCount++;
-				presetCount += list.size();
-			} catch (Exception ex) {
-				throw new BugException(ex);
-			}
+			Pair<File, InputStream> f = iterator.next();
+			Collection<ComponentPreset> presets = loadFile(f.getU().getName(), f.getV());
+			componentPresetDao.addAll(presets);
+			fileCount++;
+			presetCount += presets.size();
 		}
 	}
 	

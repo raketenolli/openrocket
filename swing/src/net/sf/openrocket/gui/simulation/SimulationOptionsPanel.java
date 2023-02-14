@@ -60,6 +60,8 @@ class SimulationOptionsPanel extends JPanel {
 	final Simulation simulation;
 	
 	private JPanel currentExtensions;
+	final JPopupMenu extensionMenu;
+	JMenu extensionMenuCopyExtension;
 	
 	SimulationOptionsPanel(OpenRocketDocument document, final Simulation simulation) {
 		super(new MigLayout("fill"));
@@ -143,7 +145,7 @@ class SimulationOptionsPanel extends JPanel {
 		subsub.add(label, "gapright para");
 		
 		m = new DoubleModel(conditions, "TimeStep", UnitGroup.UNITS_TIME_STEP,
-				0, 1);
+				0.01, 1);
 		
 		spin = new JSpinner(m.getSpinnerModel());
 		spin.setEditor(new SpinnerEditor(spin));
@@ -153,7 +155,7 @@ class SimulationOptionsPanel extends JPanel {
 		unit = new UnitSelector(m);
 		unit.setToolTipText(tip);
 		subsub.add(unit, "");
-		slider = new BasicSlider(m.getSliderModel(0, 0.2));
+		slider = new BasicSlider(m.getSliderModel(0.01, 0.2));
 		slider.setToolTipText(tip);
 		subsub.add(slider, "w 100");
 		
@@ -195,12 +197,12 @@ class SimulationOptionsPanel extends JPanel {
 		
 		
 		final JButton addExtension = new SelectColorButton(trans.get("simedtdlg.SimExt.add"));
-		final JPopupMenu menu = getExtensionMenu();
+		extensionMenu = getExtensionMenu();
 		addExtension.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent ev) {
-				menu.show(addExtension, 5, addExtension.getBounds().height);
-			}
-		});
+				public void actionPerformed(ActionEvent ev) {
+					extensionMenu.show(addExtension, 5, addExtension.getBounds().height);
+				}
+			});
 		sub.add(addExtension, "growx, wrap 0");
 		
 		currentExtensions = new JPanel(new MigLayout("fillx, gap 0 0, ins 0"));
@@ -217,7 +219,8 @@ class SimulationOptionsPanel extends JPanel {
 		});
 		
 		JPopupMenu basemenu = new JPopupMenu();
-		
+
+		//// Use code / Launch conditions
 		for (final SimulationExtensionProvider provider : extensions) {
 			List<String> ids = provider.getIds();
 			for (final String id : ids) {
@@ -234,6 +237,7 @@ class SimulationOptionsPanel extends JPanel {
 							SwingSimulationExtensionConfigurator configurator = findConfigurator(e);
 							if (configurator != null) {
 								configurator.configure(e, simulation, SwingUtilities.windowForComponent(SimulationOptionsPanel.this));
+								updateCurrentExtensions();
 							}
 						}
 					});
@@ -241,39 +245,58 @@ class SimulationOptionsPanel extends JPanel {
 				}
 			}
 		}
-		
-		JMenu copyMenu = null;
-		for (Simulation sim : document.getSimulations()) {
-			if (!sim.getSimulationExtensions().isEmpty()) {
-				JMenu menu = new JMenu(sim.getName());
-				for (final SimulationExtension ext : sim.getSimulationExtensions()) {
-					JMenuItem item = new JMenuItem(ext.getName());
-					item.addActionListener(new ActionListener() {
-						@Override
-						public void actionPerformed(ActionEvent arg0) {
-							SimulationExtension e = ext.clone();
-							simulation.getSimulationExtensions().add(e);
-							updateCurrentExtensions();
-							SwingSimulationExtensionConfigurator configurator = findConfigurator(e);
-							if (configurator != null) {
-								configurator.configure(e, simulation, SwingUtilities.windowForComponent(SimulationOptionsPanel.this));
-							}
-						}
-					});
-					menu.add(item);
-				}
-				
-				if (copyMenu == null) {
-					copyMenu = new JMenu(trans.get("simedtdlg.SimExt.copyExtension"));
-				}
-				copyMenu.add(menu);
-			}
-		}
-		if (copyMenu != null) {
-			basemenu.add(copyMenu);
-		}
+
+		//// Copy extension
+		updateExtensionMenuCopyExtension(basemenu);
 		
 		return basemenu;
+	}
+
+	/**
+	 * Updates the contents of the "Copy extension" menu item in the extension menu.
+	 * @param extensionMenu extension menu to add the "Copy extension" menu item to
+	 */
+	private void updateExtensionMenuCopyExtension(JPopupMenu extensionMenu) {
+		if (extensionMenu == null) {
+			return;
+		}
+		if (this.extensionMenuCopyExtension != null) {
+			extensionMenu.remove(this.extensionMenuCopyExtension);
+		}
+
+		this.extensionMenuCopyExtension = null;
+		for (Simulation sim : document.getSimulations()) {
+			if (sim.getSimulationExtensions().isEmpty()) {
+				continue;
+			}
+
+			JMenu menu = new JMenu(sim.getName());
+			for (final SimulationExtension ext : sim.getSimulationExtensions()) {
+				JMenuItem item = new JMenuItem(ext.getName());
+				item.addActionListener(new ActionListener() {
+					@Override
+					public void actionPerformed(ActionEvent arg0) {
+						SimulationExtension e = ext.clone();
+						simulation.getSimulationExtensions().add(e);
+						updateCurrentExtensions();
+						SwingSimulationExtensionConfigurator configurator = findConfigurator(e);
+						if (configurator != null) {
+							configurator.configure(e, simulation, SwingUtilities.windowForComponent(SimulationOptionsPanel.this));
+              updateCurrentExtensions();
+						}
+					}
+				});
+				menu.add(item);
+			}
+
+			if (this.extensionMenuCopyExtension == null) {
+				this.extensionMenuCopyExtension = new JMenu(trans.get("simedtdlg.SimExt.copyExtension"));
+			}
+			this.extensionMenuCopyExtension.add(menu);
+		}
+		if (this.extensionMenuCopyExtension != null) {
+			extensionMenu.add(this.extensionMenuCopyExtension);
+		}
 	}
 	
 	private JComponent findMenu(MenuElement menu, List<String> menuItems) {
@@ -312,6 +335,9 @@ class SimulationOptionsPanel extends JPanel {
 				currentExtensions.add(new SimulationExtensionPanel(e), "growx, wrap");
 			}
 		}
+
+		updateExtensionMenuCopyExtension(this.extensionMenu);
+
 		// Both needed:
 		this.revalidate();
 		this.repaint();
@@ -334,7 +360,8 @@ class SimulationOptionsPanel extends JPanel {
 			JButton button;
 			
 			this.add(new JPanel(), "spanx, split, growx, right");
-			
+
+			// Configure
 			if (findConfigurator(extension) != null) {
 				button = new SelectColorButton(Icons.CONFIGURE);
 				button.addActionListener(new ActionListener() {
@@ -347,7 +374,8 @@ class SimulationOptionsPanel extends JPanel {
 				});
 				this.add(button, "right");
 			}
-			
+
+			// Help
 			if (extension.getDescription() != null) {
 				button = new SelectColorButton(Icons.HELP);
 				button.addActionListener(new ActionListener() {
@@ -374,8 +402,9 @@ class SimulationOptionsPanel extends JPanel {
 				});
 				this.add(button, "right");
 			}
-			
-			button = new SelectColorButton(Icons.DELETE);
+
+			// Delete
+			button = new SelectColorButton(Icons.EDIT_DELETE);
 			button.addActionListener(new ActionListener() {
 				@Override
 				public void actionPerformed(ActionEvent arg0) {

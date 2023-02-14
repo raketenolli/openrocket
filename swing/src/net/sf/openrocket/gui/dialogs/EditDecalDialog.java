@@ -96,11 +96,11 @@ public class EditDecalDialog extends JDialog {
 				
 			} else {
 				commandText = new JTextArea();
-				commandText.setEnabled(false);
+				commandText.setEnabled(true);
 				panel.add(commandText, "growx, wrap");
 				
 				final JButton chooser = new SelectColorButton(trans.get("EditDecalDialog.btn.chooser"));
-				chooser.setEnabled(false);
+				chooser.setEnabled(true);
 				chooser.addActionListener(new ActionListener() {
 					
 					@Override
@@ -163,9 +163,11 @@ public class EditDecalDialog extends JDialog {
 		panel.add(cancelButton, "tag cancel");
 		
 		this.add(panel);
-		
-		GUIUtil.rememberWindowSize(this);
+
 		GUIUtil.setDisposableDialogOptions(this, okButton);
+		GUIUtil.rememberWindowSize(this);
+		this.setLocationByPlatform(true);
+		GUIUtil.rememberWindowPosition(this);
 		
 	}
 	

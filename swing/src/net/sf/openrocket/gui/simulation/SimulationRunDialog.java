@@ -23,6 +23,8 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JProgressBar;
 
+import net.sf.openrocket.document.events.DocumentChangeEvent;
+import net.sf.openrocket.document.events.SimulationChangeEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,8 +51,8 @@ import net.sf.openrocket.startup.Application;
 import net.sf.openrocket.unit.Unit;
 import net.sf.openrocket.unit.UnitGroup;
 import net.sf.openrocket.util.MathUtil;
+import net.sf.openrocket.util.Coordinate;
 import net.sf.openrocket.gui.widgets.SelectColorButton;
-
 
 public class SimulationRunDialog extends JDialog {
 	private static final long serialVersionUID = -1593459321777026455L;
@@ -207,9 +209,12 @@ public class SimulationRunDialog extends JDialog {
 	 *            the parent Window of the dialog to use.
 	 * @param simulations
 	 *            the simulations to run.
+	 * @return	  the simulation run dialog instance.
 	 */
-	public static void runSimulations(Window parent, OpenRocketDocument document, Simulation... simulations) {
-		new SimulationRunDialog(parent, document, simulations).setVisible(true);
+	public static SimulationRunDialog runSimulations(Window parent, OpenRocketDocument document, Simulation... simulations) {
+		SimulationRunDialog dialog = new SimulationRunDialog(parent, document, simulations);
+		dialog.setVisible(true);
+		return dialog;
 	}
 
 	private void updateProgress() {
@@ -258,6 +263,18 @@ public class SimulationRunDialog extends JDialog {
 	}
 
 	/**
+	 * Returns true if all the simulations ran successfully. Returns false if the simulations encountered
+	 * an exception, or were cancelled.
+	 */
+	public boolean isAllSimulationsSuccessful() {
+		for (SimulationWorker w : simulationWorkers) {
+			if (w.getThrowable() != null)
+				return false;
+		}
+		return true;
+	}
+
+	/**
 	 * A SwingWorker that performs a flight simulation. It periodically updates
 	 * the simulation statuses of the parent class and calls updateProgress().
 	 * The progress of the simulation is stored in the progress property of the
@@ -273,10 +290,14 @@ public class SimulationRunDialog extends JDialog {
 		private volatile double apogeeAltitude;
 
 		private final CustomExpressionSimulationListener exprListener;
+		private final OpenRocketDocument document;
 
 		/*
-		 * -2 = time from 0 ... burnoutTimeEstimate -1 = velocity from
-		 * v(burnoutTimeEstimate) ... 0 0 ... n = stages from alt(max) ... 0
+		 * Keep track of current phase ("stage") of simulation
+		 * -2:        Boost.  Estimate progress using time from 0 to burnoutTimeEstimate
+		 * -1:        Coast.  Estimate progress using velocity from v(burnoutTimeEstimate) to 0
+		 * 0 ... n:   Landing. Estimate progress using altitude from alt(max) ... 0
+		 * (it appears as if the idea is to use values above 0 to support multiple stages, but this is not implemented)
 		 */
 		private volatile int simulationStage = -2;
 
@@ -284,7 +305,8 @@ public class SimulationRunDialog extends JDialog {
 
 		public InteractiveSimulationWorker(OpenRocketDocument doc, Simulation sim, int index) {
 			super(sim);
-			List<CustomExpression> exprs = doc.getCustomExpressions();
+			this.document = doc;
+			List<CustomExpression> exprs = document.getCustomExpressions();
 			exprListener = new CustomExpressionSimulationListener(exprs);
 			this.index = index;
 
@@ -322,49 +344,57 @@ public class SimulationRunDialog extends JDialog {
 		@Override
 		protected void process(List<SimulationStatus> chunks) {
 
-			// Update max. altitude and velocity
+			// Update max. altitude and velocity of sustainer.  Because parts of the simulation may be run more than once
+			// in order to calculate things like optimal coast time, we'll keep updating max altitude
+			// whenever we see that the rocket is going upwards.  The last apogee found is the real one.
 			for (SimulationStatus s : chunks) {
-				simulationMaxAltitude[index] = Math.max(simulationMaxAltitude[index], s.getRocketPosition().z);
-				simulationMaxVelocity[index] = Math.max(simulationMaxVelocity[index], s.getRocketVelocity().length());
+				if (s.getConfiguration().isStageActive(0) &&
+					((s.getRocketVelocity().z > 0) || (s.getRocketPosition().z > simulationMaxAltitude[index]))) {
+					log.debug("updating simulationMaxAltitude[" + index + "] to " + s.getRocketPosition().z);
+					simulationMaxAltitude[index] = s.getRocketPosition().z;
+					simulationMaxVelocity[index] = Math.max(simulationMaxVelocity[index], s.getRocketVelocity().z);
+				}
 			}
 
 			// Calculate the progress
 			SimulationStatus status = chunks.get(chunks.size() - 1);
 			simulationStatuses[index] = status;
 
-			// 1. time = 0 ... burnoutTimeEstimate
+			// -2: Boost.  time = 0 ... burnoutTimeEstimate
 			if (simulationStage == -2 && status.getSimulationTime() < burnoutTimeEstimate) {
-				log.debug("Method 1:  t=" + status.getSimulationTime() + "  est=" + burnoutTimeEstimate);
+				log.debug("simulationStage boost:  t=" + status.getSimulationTime() + "  est=" + burnoutTimeEstimate);
 				setSimulationProgress(
 						MathUtil.map(status.getSimulationTime(), 0, burnoutTimeEstimate, 0.0, BURNOUT_PROGRESS));
 				updateProgress();
 				return;
 			}
 
+			// Past burnout time estimate, switch to coast.
 			if (simulationStage == -2) {
 				simulationStage++;
 				burnoutVelocity = MathUtil.max(status.getRocketVelocity().z, 0.1);
-				log.debug("CHANGING to Method 2, vel=" + burnoutVelocity);
+				log.debug("CHANGING to simulationStage " + simulationStage + ", vel=" + burnoutVelocity);
 			}
 
-			// 2. z-velocity from burnout velocity to zero
+			// -1: Coast.  z-velocity from burnout velocity to zero
 			if (simulationStage == -1 && status.getRocketVelocity().z >= 0) {
-				log.debug("Method 2:  vel=" + status.getRocketVelocity().z + " burnout=" + burnoutVelocity);
+				log.debug("simulationStage coast:  vel=" + status.getRocketVelocity().z + " burnout=" + burnoutVelocity);
 				setSimulationProgress(MathUtil.map(status.getRocketVelocity().z, burnoutVelocity, 0, BURNOUT_PROGRESS,
 						APOGEE_PROGRESS));
 				updateProgress();
 				return;
 			}
 
+			// Past apogee, switch to landing
 			if (simulationStage == -1 && status.getRocketVelocity().z < 0) {
 				simulationStage++;
-				apogeeAltitude = MathUtil.max(status.getRocketPosition().z, 1);
-				log.debug("CHANGING to Method 3, apogee=" + apogeeAltitude);
+				apogeeAltitude = MathUtil.max(simulationMaxAltitude[index], 1);
+				log.debug("CHANGING to simulationStage " + simulationStage + ", apogee=" + apogeeAltitude);
 			}
 
-			// 3. z-position from apogee to zero
+			// >= 0 Landing. z-position from apogee to zero
 			// TODO: MEDIUM: several stages
-			log.debug("Method 3:  alt=" + status.getRocketPosition().z + "  apogee=" + apogeeAltitude);
+			log.debug("simulationStage landing (" + simulationStage + "):  alt=" + status.getRocketPosition().z + "  apogee=" + apogeeAltitude);
 			setSimulationProgress(MathUtil.map(status.getRocketPosition().z, apogeeAltitude, 0, APOGEE_PROGRESS, 1.0));
 			updateProgress();
 		}
@@ -378,6 +408,7 @@ public class SimulationRunDialog extends JDialog {
 			log.debug("Simulation done");
 			setSimulationProgress(1.0);
 			updateProgress();
+			document.fireDocumentChangeEvent(new SimulationChangeEvent(simulation));
 		}
 
 		/**
@@ -439,20 +470,18 @@ public class SimulationRunDialog extends JDialog {
 			public boolean handleFlightEvent(SimulationStatus status, FlightEvent event) {
 				switch (event.getType()) {
 				case APOGEE:
-					simulationStage = 0;
-					apogeeAltitude = status.getRocketPosition().z;
-					log.debug("APOGEE, setting progress");
-					setSimulationProgress(APOGEE_PROGRESS);
-					publish(status);
+					log.debug("APOGEE");
+					publish(new SimulationStatus(status));
 					break;
 
 				case LAUNCH:
-					publish(status);
+					log.debug("LAUNCH");
+					publish(new SimulationStatus(status));
 					break;
 
 				case SIMULATION_END:
-					log.debug("END, setting progress");
-					setSimulationProgress(1.0);
+					log.debug("END");
+					publish(new SimulationStatus(status));
 					break;
 					
 				default:
@@ -465,7 +494,7 @@ public class SimulationRunDialog extends JDialog {
 			public void postStep(SimulationStatus status) {
 				if (System.currentTimeMillis() >= time + UPDATE_MS) {
 					time = System.currentTimeMillis();
-					publish(status);
+					publish(new SimulationStatus(status));
 				}
 			}
 		}

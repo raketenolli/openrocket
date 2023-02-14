@@ -8,9 +8,9 @@ import net.sf.openrocket.preset.TypedKey;
 import net.sf.openrocket.preset.TypedPropertyMap;
 import net.sf.openrocket.util.BugException;
 
-public class MaterialLoader extends RocksimComponentFileLoader {
+public class MaterialLoader extends RockSimComponentFileLoader {
 	
-	private MaterialHolder materialMap = new MaterialHolder();
+	private final MaterialHolder materialMap = new MaterialHolder();
 	
 	private final static TypedKey<String> MATERIALNAME = new TypedKey<String>("MaterialName", String.class);
 	private final static TypedKey<String> UNITS = new TypedKey<String>("Units", String.class);
@@ -24,8 +24,8 @@ public class MaterialLoader extends RocksimComponentFileLoader {
 	}
 	
 	@Override
-	protected RocksimComponentFileType getFileType() {
-		return RocksimComponentFileType.MATERIAL;
+	protected RockSimComponentFileType getFileType() {
+		return RockSimComponentFileType.MATERIAL;
 	}
 	
 	public MaterialHolder getMaterialMap() {

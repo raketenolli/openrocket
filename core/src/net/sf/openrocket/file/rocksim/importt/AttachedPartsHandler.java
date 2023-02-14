@@ -5,9 +5,10 @@ package net.sf.openrocket.file.rocksim.importt;
 
 import net.sf.openrocket.aerodynamics.WarningSet;
 import net.sf.openrocket.file.DocumentLoadingContext;
-import net.sf.openrocket.file.rocksim.RocksimCommonConstants;
+import net.sf.openrocket.file.rocksim.RockSimCommonConstants;
 import net.sf.openrocket.file.simplesax.AbstractElementHandler;
 import net.sf.openrocket.file.simplesax.ElementHandler;
+import net.sf.openrocket.rocketcomponent.PodSet;
 import net.sf.openrocket.rocketcomponent.RocketComponent;
 
 import java.util.HashMap;
@@ -46,44 +47,53 @@ class AttachedPartsHandler extends AbstractElementHandler {
 
     @Override
 	public ElementHandler openElement(String element, HashMap<String, String> attributes, WarningSet warnings) {
-		if (RocksimCommonConstants.FIN_SET.equals(element)) {
+		if (RockSimCommonConstants.FIN_SET.equals(element)) {
 			return new FinSetHandler(context, component);
 		}
-		if (RocksimCommonConstants.CUSTOM_FIN_SET.equals(element)) {
+		if (RockSimCommonConstants.CUSTOM_FIN_SET.equals(element)) {
 			return new FinSetHandler(context, component);
 		}
-		if (RocksimCommonConstants.LAUNCH_LUG.equals(element)) {
+		if (RockSimCommonConstants.LAUNCH_LUG.equals(element)) {
 			return new LaunchLugHandler(context, component, warnings);
 		}
-		if (RocksimCommonConstants.PARACHUTE.equals(element)) {
+		if (RockSimCommonConstants.PARACHUTE.equals(element)) {
 			return new ParachuteHandler(context, component, warnings);
 		}
-		if (RocksimCommonConstants.STREAMER.equals(element)) {
+		if (RockSimCommonConstants.STREAMER.equals(element)) {
 			return new StreamerHandler(context, component, warnings);
 		}
-		if (RocksimCommonConstants.MASS_OBJECT.equals(element)) {
+		if (RockSimCommonConstants.MASS_OBJECT.equals(element)) {
 			return new MassObjectHandler(context, component, warnings);
 		}
-		if (RocksimCommonConstants.RING.equals(element)) {
+		if (RockSimCommonConstants.RING.equals(element)) {
 			return new RingHandler(context, component, warnings);
 		}
-		if (RocksimCommonConstants.BODY_TUBE.equals(element)) {
-			return new InnerBodyTubeHandler(context, component, warnings);
+		if (RockSimCommonConstants.BODY_TUBE.equals(element)) {
+			// Pods can have BodyTubes as attached parts, but not inner tubes. All other components can't have BodyTubes as
+			// attached parts.
+			if (component instanceof PodSet) {
+				return new BodyTubeHandler(context, component, warnings);
+			} else {
+				return new InnerBodyTubeHandler(context, component, warnings);
+			}
 		}
-		if (RocksimCommonConstants.TRANSITION.equals(element)) {
+		if (RockSimCommonConstants.TRANSITION.equals(element)) {
 			return new TransitionHandler(context, component, warnings);
 		}
-		if (RocksimCommonConstants.SUBASSEMBLY.equals(element)) {
+		if (RockSimCommonConstants.NOSE_CONE.equals(element)) {
+			return new NoseConeHandler(context, component, warnings);
+		}
+		if (RockSimCommonConstants.SUBASSEMBLY.equals(element)) {
 			return new SubAssemblyHandler(context, component);
 		}
-		if (RocksimCommonConstants.TUBE_FIN_SET.equals(element)) {
+		if (RockSimCommonConstants.TUBE_FIN_SET.equals(element)) {
 			return new TubeFinSetHandler(context, component, warnings);
 		}
-		if (RocksimCommonConstants.RING_TAIL.equals(element)) {
-			warnings.add("Ring tails are not currently supported. Ignoring.");
+		if (RockSimCommonConstants.EXTERNAL_POD.equals(element)) {
+			return new PodHandler(context, component, warnings);
 		}
-		if (RocksimCommonConstants.EXTERNAL_POD.equals(element)) {
-			warnings.add("Pods are not currently supported. Ignoring.");
+		if (RockSimCommonConstants.RING_TAIL.equals(element)) {
+			warnings.add("Ring tails are not currently supported. Ignoring.");
 		}
 		return null;
 	}
