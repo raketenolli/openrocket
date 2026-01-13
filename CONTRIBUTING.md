@@ -42,7 +42,7 @@ Explain the new feature in detail:
 * Why is this new feature important
 
 ## Development
-Please read our [Developer's Guide](https://github.com/openrocket/openrocket/wiki/Developer%27s-Guide). If you still have questions about how to set up your environment, with which issues you should start etc., then don't be afraid to send us a message on [Slack](https://join.slack.com/t/openrocket/shared_invite/zt-dh0wtpc4-WmkSK1ysqAOqHa6eFN7zgA).
+Please read our [Developer's Guide](https://openrocket.readthedocs.io/en/latest/dev_guide/development_overview.html). If you still have questions about how to set up your environment, with which issues you should start etc., then don't be afraid to send us a message on [Slack](https://join.slack.com/t/openrocket/shared_invite/zt-dh0wtpc4-WmkSK1ysqAOqHa6eFN7zgA).
 
 Developing OpenRocket may be daunting at first, but if you keep Google, your IDE's search and debug features, and the other developers as close friends, then you will easily create your first pull request.
 
@@ -63,17 +63,16 @@ Right, you've dug into the codebase, found that one nasty line that caused all y
 1. Explain briefly which issue that you are trying to solve, e.g. 'This PR solves #123 in which buttons were displayed as red instead of blue' 
 2. Next explain what the underlying issue was, e.g. 'The problem was that by default Java swing displays buttons as red.' 
 3. Next is how you fixed the issue, e.g. 'Fixed it by overriding the default button color to blue' 
-4. Finally, for other people to test your code, it is good to include a jar file of your fixed OpenRocket. This can be done using ant ([more info here](https://github.com/openrocket/openrocket/wiki/Instructions-to-Build-from-Terminal)). You can upload this jar-file to e.g. Dropbox or Google Drive and include it in your PR, e.g. 'Here is a jar file for testing: ' or if you're really GitHub-savvy, you can add a hyperlink to the 'jar file'-text. If necessary, you can also include information on how to recreate the original issue so that testers can check whether your code solved the issue. If needed, you can also included information about the expected behavior so that others know what your solution should do.
 
 You can take a look at example PR [#979](https://github.com/openrocket/openrocket/pull/979).
 
 ## Translation
-Both the OpenRocket software and the end-user documentation wiki site are multilingual. The job of a translator is to maintain the existing languages, or to make a new translation of an unlisted language. During the development sometimes new translation keys get added in the English language that are not simultaneously translated to other languages. The translator must therefor check which translation keys are still missing in his/her/they language.
+Both the OpenRocket software and the end-user documentation site are multilingual. The job of a translator is to maintain the existing languages, or to make a new translation of an unlisted language. During the development sometimes new translation keys get added in the English language that are not simultaneously translated to other languages. The translator must therefore check which translation keys are still missing in his/her/their language.
 
-How you can make/edit a translation can be found on [this site](http://openrocket.trans.free.fr/index.php?lang=en) or the [GitHub wiki](https://github.com/openrocket/openrocket/wiki/Instructions-for-translators).
+How you can make/edit a translation can be found in the [Developer's Guide](https://openrocket.readthedocs.io/en/latest/dev_guide/contributing_to_translations.html).
 
 ## Documentation
-We have two main documentation channels: a [GitHub wiki](https://github.com/openrocket/openrocket/wiki) and an [OpenRocket wiki page](http://wiki.openrocket.info/Main_Page), both of which require regular updates to keep up to date with the latest developments in the software.
+Our documentation is hosted on [ReadTheDocs](https://openrocket.readthedocs.io/en/latest/index.html).
 
 ## Anything else
 Do you have the perfect voice for making OpenRocket tutorials, are you a graphical designer that screams to improve OR's design, or are you the salesman that can grow OR's influence? Then go for it! We highly appreciate any help that we get, in any shape or form. 🙃
